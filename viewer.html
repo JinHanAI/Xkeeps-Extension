@@ -722,7 +722,7 @@ kbd {
 // ---- App State ----
 let allBookmarks = [];
 let allFolders = [];
-let folderMap = {};        // folder name -> [bookmark indices]
+let folderMap = new Map(); // folder name -> [bookmark indices]
 let filteredIndices = [];  // indices into allBookmarks
 let activeFolder = null;
 let searchQuery = '';
@@ -737,7 +737,7 @@ let visibleRange = { start: 0, end: 0 };
 const OVERSCAN = 5;
 
 // ---- Search Index ----
-let searchIndex = {};  // token -> Set of bookmark indices
+let searchIndex = new Map();  // token -> [bookmark indices]
 
 // ---- DOM refs ----
 let feedEl, feedInnerEl, searchEl, resultCountEl, folderListEl, folderSearchEl, sortBtn, backToTopBtn;
@@ -1018,6 +1018,9 @@ async function processData(data) {
 
   allFolders = data.folders || [];
   allBookmarks = data.bookmarks || [];
+  folderMap = new Map();
+  searchIndex = new Map();
+  sortedIndexKeys = [];
   const totalCount = allBookmarks.length;
 
   setStatus(`Processing ${totalCount.toLocaleString()} bookmarks...`);
@@ -1033,8 +1036,8 @@ async function processData(data) {
     b._searchText = buildSearchText(b).toLowerCase();
     if (b.folders) {
       for (const fname of b.folders) {
-        if (!folderMap[fname]) folderMap[fname] = [];
-        folderMap[fname].push(i);
+        if (!folderMap.has(fname)) folderMap.set(fname, []);
+        folderMap.get(fname).push(i);
       }
     }
     // Yield to UI every BATCH_SIZE items
@@ -1117,8 +1120,8 @@ function buildSearchIndex() {
     for (const t of tokens) {
       if (seen.has(t)) continue;
       seen.add(t);
-      if (!searchIndex[t]) searchIndex[t] = [];
-      searchIndex[t].push(i);
+      if (!searchIndex.has(t)) searchIndex.set(t, []);
+      searchIndex.get(t).push(i);
     }
   }
 }
@@ -1132,7 +1135,7 @@ function searchBookmarks(query) {
 
   // Build sorted keys lazily
   if (sortedIndexKeys.length === 0) {
-    sortedIndexKeys = Object.keys(searchIndex).sort();
+    sortedIndexKeys = [...searchIndex.keys()].sort();
   }
 
   let result = null;
@@ -1150,7 +1153,7 @@ function searchBookmarks(query) {
     for (let i = lo; i < sortedIndexKeys.length; i++) {
       const key = sortedIndexKeys[i];
       if (!key.startsWith(token)) break;
-      for (const idx of searchIndex[key]) matches.add(idx);
+      for (const idx of searchIndex.get(key)) matches.add(idx);
     }
 
     if (result === null) {
@@ -1172,7 +1175,7 @@ function applyFilters() {
 
   // Start with folder filter
   if (activeFolder) {
-    indices = folderMap[activeFolder] ? [...folderMap[activeFolder]] : [];
+    indices = folderMap.has(activeFolder) ? [...folderMap.get(activeFolder)] : [];
   } else {
     indices = Array.from({ length: allBookmarks.length }, (_, i) => i);
   }
@@ -1547,7 +1550,7 @@ function renderFolders(filter) {
 
   for (const f of allFolders) {
     if (fq && !f.name.toLowerCase().includes(fq)) continue;
-    const count = folderMap[f.name]?.length || 0;
+    const count = folderMap.get(f.name)?.length || 0;
     html += `<div class="folder-item${activeFolder === f.name ? ' active' : ''}" data-folder="${escHtml(f.name)}">
       <span>${escHtml(f.name)}</span>
       <span class="folder-count">${formatNum(count)}</span>
@@ -1570,10 +1573,10 @@ function selectFolder(name) {
   } else if (name === '__unfiled__') {
     activeFolder = '__unfiled__';
     // Build unfiled indices on the fly
-    folderMap['__unfiled__'] = [];
+    folderMap.set('__unfiled__', []);
     for (let i = 0; i < allBookmarks.length; i++) {
       if (!allBookmarks[i].folders || allBookmarks[i].folders.length === 0) {
-        folderMap['__unfiled__'].push(i);
+        folderMap.get('__unfiled__').push(i);
       }
     }
   } else {
