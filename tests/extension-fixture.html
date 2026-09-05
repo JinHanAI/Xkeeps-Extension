@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Extension UI fixture</title>
+<p>Loading the extension UI with synthetic X responses. No requests go to X.</p>
+<script>
+(async () => {
+  const html = await (await fetch('../options.html')).text();
+  document.open();
+  document.write(html.replace('<head>', '<head><base href="/"><script src="tests/extension-fixture.js"><' + '/script>'));
+  document.close();
+})();
+</script></html>

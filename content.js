@@ -5,7 +5,7 @@
  * identity and store it in chrome.storage.local for the options page.
  *
  * Two pieces of data are captured:
- *   1. **User ID** (numeric) — from the `twid` cookie at document_start.
+ *   1. **User ID** (string) — from the `twid` cookie when labeling the profile.
  *   2. **Screen name** (@handle) — from the page DOM after load, by
  *      finding the profile link in X.com's navigation sidebar.
  *
@@ -13,13 +13,13 @@
  * isolated world.
  */
 
-// --- User ID (from cookie, available immediately) ---
-(function () {
-  const match = document.cookie.match(/twid=u%3D(\d+)/);
-  if (match) {
-    chrome.storage.local.set({ xarchive_user_id: match[1] });
-  }
-})();
+// Session identity for requests comes from chrome.cookies in lib/identity.js.
+// This cookie is used only to attach a display label to the correct account.
+function pageUserId() {
+  const value = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('twid='))?.slice(5);
+  try { return decodeURIComponent(value || '').replaceAll('"', '').match(/^u=(\d+)$/)?.[1] || null; }
+  catch { return null; }
+}
 
 // --- Screen name (from DOM, after page renders) ---
 // X.com's SPA renders a navigation link to the user's profile in the
@@ -34,7 +34,8 @@ function captureScreenName() {
     if (href && href.startsWith('/')) {
       const screenName = href.slice(1).split('/')[0]; // strip leading /
       if (screenName && !screenName.includes('?')) {
-        chrome.storage.local.set({ xarchive_screen_name: screenName });
+        const userId = pageUserId();
+        if (userId) chrome.storage.local.set({ [`xarchive_profile_${userId}`]: screenName });
         return true;
       }
     }
@@ -60,3 +61,7 @@ function tryCapture() {
     }
   }, 1000);
 }
+
+// SPA account switches do not reload the content script. Refresh the label
+// when the user returns to the page; numeric identity never depends on it.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tryCapture(); });

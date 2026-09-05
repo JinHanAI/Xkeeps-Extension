@@ -1,0 +1,8 @@
+{
+  "export_metadata": { "user_id": "42", "screen_name": "archive_demo", "exported_at": "2026-08-01T00:00:00.000Z", "collection": { "mode": "full", "bookmarks": "complete", "folders": "complete" } },
+  "folders": [{ "id": "f1", "name": "Reading" }],
+  "bookmarks": [
+    { "tweet_id": "100", "status": "available", "created_at": "2026-07-30T12:00:00Z", "full_text": "A saved post about gardening. Keep this text even if the post becomes unavailable.", "author": { "name": "Archive Demo", "screen_name": "archive_demo" }, "folders": ["Reading"], "folder_ids": ["f1"] },
+    { "tweet_id": "101", "status": "available", "created_at": "2026-07-31T12:00:00Z", "full_text": "An older bookmark that will be missing from the next snapshot. It should stay in the archive.", "author": { "name": "Archive Demo", "screen_name": "archive_demo" }, "folders": [], "folder_ids": [] }
+  ]
+}

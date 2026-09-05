@@ -1,0 +1,8 @@
+{
+  "export_metadata": { "user_id": "42", "screen_name": "archive_demo", "exported_at": "2026-09-01T00:00:00.000Z", "collection": { "mode": "full", "bookmarks": "complete", "folders": "complete" } },
+  "folders": [{ "id": "f1", "name": "Read later" }],
+  "bookmarks": [
+    { "tweet_id": "100", "status": "unavailable", "unavailable_reason": "No longer available", "folders": ["Read later"], "folder_ids": ["f1"] },
+    { "tweet_id": "102", "status": "available", "created_at": "2026-08-31T12:00:00Z", "full_text": "A new bookmark about astronomy, added by this update.", "author": { "name": "Archive Demo", "screen_name": "archive_demo" }, "folders": ["Read later"], "folder_ids": ["f1"] }
+  ]
+}

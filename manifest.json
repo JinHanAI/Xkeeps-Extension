@@ -1,20 +1,21 @@
 {
   "manifest_version": 3,
   "name": "xarchive",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "minimum_chrome_version": "120",
   "description": "Export all your X.com bookmarks with folder assignments",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "cookies",
     "webRequest",
-    "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
     "downloads"
   ],
   "host_permissions": [
     "https://x.com/*",
-    "https://twitter.com/*"
+    "https://twitter.com/*",
+    "https://abs.twimg.com/*"
   ],
   "background": {
     "service_worker": "background.js",

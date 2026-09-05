@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>xarchive storage tests</title>
+<style>body{font:16px system-ui;padding:32px;background:#111;color:#ddd}li{margin:12px 0}</style>
+<h1>Archive storage tests</h1><p>Uses a unique disposable database with synthetic data.</p><ul id="results"></ul><p id="status" role="status">Running…</p>
+<script src="../lib/archive.js"></script>
+<script>
+(async () => {
+  const name = `xarchive-test-${crypto.randomUUID()}`;
+  const store = new XArchive.ArchiveStore(name);
+  const out = document.getElementById('results');
+  let failures = 0, tests = 0;
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const test = async (name, fn) => {
+    tests++;
+    const li = document.createElement('li');
+    try { await fn(); li.textContent = `PASS: ${name}`; }
+    catch (err) { li.textContent = `FAIL: ${name}: ${err.message}`; failures++; }
+    out.appendChild(li);
+  };
+  const base = XArchive.merge(null, await (await fetch('fixtures/base.json')).json()).data;
+  const update = XArchive.merge(base, await (await fetch('fixtures/update.json')).json()).data;
+  let saved;
+  await test('Save and reopen preserve the complete archive', async () => {
+    saved = await store.save('user:42', base);
+    assert((await new XArchive.ArchiveStore(name).get('user:42')).data.bookmarks.length === 2, 'did not persist');
+  });
+  await test('Update stores a persistent undo copy', async () => {
+    saved = await store.save('user:42', update, saved.revision);
+    assert(saved.data.bookmarks.length === 3 && saved.previous.bookmarks.length === 2, 'wrong current or previous');
+  });
+  await test('Concurrent tabs cannot overwrite a newer revision', async () => {
+    let rejected = false;
+    try { await new XArchive.ArchiveStore(name).save('user:42', base, 1); } catch { rejected = true; }
+    assert(rejected && (await store.get('user:42')).revision === 2, 'stale overwrite accepted');
+  });
+  await test('An aborted storage transaction preserves current and undo', async () => {
+    try { await store.transaction('readwrite', (table, done, fail) => { table.put({ key: 'user:42', data: base }); fail(new Error('Simulated storage failure')); }); } catch {}
+    const record = await store.get('user:42');
+    assert(record.revision === 2 && record.previous.bookmarks.length === 2, 'failed transaction changed data');
+  });
+  await test('Invalid input cannot replace the saved archive', async () => {
+    let rejected = false;
+    try { await store.save('user:42', { bookmarks: 'invalid' }, 2); } catch { rejected = true; }
+    assert(rejected && (await store.get('user:42')).revision === 2, 'invalid input stored');
+  });
+  await test('Undo survives reopening and restores the exact previous archive once', async () => {
+    const restored = await new XArchive.ArchiveStore(name).undo('user:42', 2);
+    assert(JSON.stringify(restored.data) === JSON.stringify(base) && restored.previous === null, 'wrong undo');
+    let rejected = false;
+    try { await store.undo('user:42', restored.revision); } catch { rejected = true; }
+    assert(rejected, 'undo was available twice');
+  });
+  await test('Accounts retain separate records', async () => {
+    const other = JSON.parse(JSON.stringify(base));
+    other.export_metadata.user_id = '43';
+    await store.save('user:43', other);
+    assert((await store.list()).length === 2 && (await store.get('user:42')).data.export_metadata.user_id === '42', 'accounts mixed');
+  });
+  await test('Storage rejects an account/key mismatch', async () => {
+    let rejected = false;
+    try { await store.save('user:43', base, 1); } catch { rejected = true; }
+    assert(rejected && (await store.get('user:43')).data.export_metadata.user_id === '43', 'wrong account accepted');
+  });
+  await test('Thrown transaction actions abort pending writes', async () => {
+    try { await store.transaction('readwrite', table => { table.put({ key: 'user:42', data: update }); throw new Error('Simulated exception'); }); } catch {}
+    assert((await store.get('user:42')).revision === 3, 'throwing action committed');
+  });
+  await test('Undo also restores the active account selection', async () => {
+    await store.save('user:42', update, 3);
+    await store.select('user:43');
+    await store.undo('user:42', 4);
+    assert((await store.get('active')).value === 'user:42', 'undo left another account selected');
+  });
+  indexedDB.deleteDatabase(name);
+  document.getElementById('status').textContent = failures ? `${failures} tests failed` : `All ${tests} storage tests passed`;
+})();
+</script></html>

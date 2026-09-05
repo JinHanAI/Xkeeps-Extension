@@ -1,0 +1,26 @@
+name: Bug report
+description: Report an export, update, import, or viewer problem
+body:
+  - type: markdown
+    attributes:
+      value: Please omit private archive files, cookies, session headers, and personal post content. A short sanitized example is enough.
+  - type: input
+    id: version
+    attributes:
+      label: xarchive and browser versions
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and expected behavior
+      description: Include Full refresh, Quick update, file import, URL import, or Undo as applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the status or HTTP code and whether the saved archive remained available. Remove personal details from logs.
+    validations:
+      required: true

@@ -10,7 +10,7 @@
   <div class="container">
     <header>
       <h1>xarchive</h1>
-      <p class="subtitle">Export all your X.com bookmarks</p>
+      <p class="subtitle">Keep a growing archive of your X.com bookmarks</p>
     </header>
 
     <!-- Status Section -->
@@ -29,12 +29,33 @@
         <span id="user-text">Checking user session...</span>
       </div>
       <p id="hint-text" class="hint" style="display:none;"></p>
+      <button id="btn-connection" class="secondary" disabled>Refresh X connection</button>
+      <p class="help">If X rejects a request, refresh the connection to capture current request settings. This briefly opens X tabs; your saved archive stays unchanged.</p>
     </section>
 
     <!-- Controls Section -->
-    <section id="controls-section" class="card">
+    <section id="library-section" class="card">
+      <h2>Your saved archive</h2>
+      <p id="library-status" role="status" aria-live="polite">Loading saved archive…</p>
+      <p id="library-refresh" class="help"></p>
       <div class="button-row">
-        <button id="btn-start" disabled>Start Export</button>
+        <button id="btn-import" class="secondary">Import existing JSON</button>
+        <button id="btn-combined" disabled>Download combined archive</button>
+        <button id="btn-undo" class="secondary" disabled>Undo last update</button>
+      </div>
+      <input id="library-file" type="file" accept=".json,application/json" hidden>
+      <p class="help">Import an earlier export to start with your existing data. Updates add and refresh bookmarks; missing or unavailable posts never erase saved content. Each X account has a separate archive.</p>
+      <p class="help">The extension and viewer keep separate browser copies. Download the combined JSON here, then use <strong>Update from JSON</strong> in the viewer. Keep downloaded files as backups.</p>
+    </section>
+    <section id="controls-section" class="card">
+      <label for="update-mode">Update from X</label>
+      <select id="update-mode">
+        <option value="full">Full refresh — all bookmarks and folders</option>
+        <option value="quick">Quick update — recent bookmarks only</option>
+      </select>
+      <p id="mode-help" class="help">Full refresh checks every page and folder. Your previous archive stays saved until collected data is safely merged. Keep this tab open.</p>
+      <div class="button-row">
+        <button id="btn-start" disabled>Full refresh</button>
         <button id="btn-pause" style="display:none;">Pause</button>
         <button id="btn-resume" style="display:none;">Resume</button>
         <button id="btn-stop" style="display:none;">Stop</button>
@@ -87,16 +108,20 @@
     <!-- Result Section (shown after complete or stop) -->
     <section id="result-section" class="card" style="display:none;">
       <h2 id="result-heading">Export Complete</h2>
+      <p id="result-account" class="help"></p>
+      <p id="result-coverage" class="help" role="status"></p>
       <div class="complete-stats">
-        <p><strong id="result-total">0</strong> bookmarks exported</p>
+        <p><strong id="result-total">0</strong> bookmarks collected in this scan</p>
         <p><strong id="result-available">0</strong> available, <strong id="result-unavailable">0</strong> unavailable</p>
         <div id="result-unavailable-reasons" style="display:none;"></div>
-        <p><strong id="result-folders">0</strong> folders found</p>
+        <p id="result-folder-summary"><strong id="result-folders">0</strong> folders found</p>
         <p>Duration: <strong id="result-duration">0:00</strong></p>
       </div>
       <div class="button-row">
-        <button id="btn-download">Download JSON</button>
+        <button id="btn-download">Download latest snapshot</button>
+        <button id="btn-recover" class="secondary">Merge collected snapshot</button>
       </div>
+      <p class="help">A snapshot contains only this scan’s results. The combined archive above includes previously saved bookmarks too. Pause/Resume works while this tab stays open. After closing it, collected data can be recovered here; the next scan starts from the beginning.</p>
     </section>
 
     <!-- Footer -->
@@ -105,6 +130,15 @@
       &middot; <a href="https://github.com/sytelus/xarchive" target="_blank" rel="noopener">GitHub</a>
     </footer>
   </div>
+
+  <dialog id="library-review" aria-labelledby="library-review-title">
+    <h2 id="library-review-title">Review archive import</h2>
+    <p id="library-review-summary"></p>
+    <p id="library-review-coverage" class="help"></p>
+    <p id="library-review-expectation" class="help">Save adds and refreshes bookmarks for this account. Older saved content stays. Undo restores your previous archive.</p>
+    <p id="library-review-error" role="alert"></p>
+    <div class="button-row"><button id="library-cancel" class="secondary">Cancel</button><button id="library-save">Save update</button></div>
+  </dialog>
 
   <script type="module" src="options.js"></script>
 </body>

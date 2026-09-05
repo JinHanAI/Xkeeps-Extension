@@ -243,6 +243,16 @@ footer a:hover {
   text-decoration: underline;
 }
 
+.help { color: #b2bac3; line-height: 1.5; font-size: .9rem; margin: .75rem 0; }
+#library-status { line-height: 1.6; overflow-wrap: anywhere; }
+select { display: block; max-width: 100%; margin-top: .5rem; padding: .65rem; color: #e7e9ea; background: #0a0a0a; border: 1px solid #536471; border-radius: 8px; font: inherit; }
+button.secondary { background: transparent; border-color: #536471; }
+button:focus-visible, select:focus-visible { outline: 2px solid #1d9bf0; outline-offset: 3px; }
+dialog { margin: auto; width: min(560px, calc(100vw - 32px)); max-height: 85vh; overflow: auto; padding: 1.5rem; border: 1px solid #536471; border-radius: 12px; background: #16181c; color: #e7e9ea; }
+dialog::backdrop { background: #000b; }
+dialog h2, dialog p { margin-bottom: 1rem; }
+@media (max-width: 600px) { body { padding: 12px; } .card { padding: 16px; } button { padding: .6rem 1rem; } }
+
 /* Scrollbar */
 .log-container::-webkit-scrollbar {
   width: 6px;

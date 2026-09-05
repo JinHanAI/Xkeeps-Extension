@@ -31,3 +31,6 @@ npm-debug.log*
 
 # Chrome extension development
 key.pem
+
+# Personal exports belong outside source control. Tests use named synthetic fixtures.
+xarchive_*.json

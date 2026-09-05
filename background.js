@@ -14,6 +14,8 @@
  * termination.
  */
 
+import { getSessionUserId, updateCredentials } from './lib/identity.js';
+
 /** Matches bookmark-related GraphQL operations to capture their query IDs. */
 const GRAPHQL_PATTERN = /\/graphql\/([^/]+)\/(Bookmarks|BookmarkFoldersSlice|BookmarkFolderTimeline)\b/;
 
@@ -22,6 +24,9 @@ const CAPTURE_HEADERS = ['authorization', 'x-csrf-token', 'x-client-uuid', 'x-cl
 
 chrome.webRequest.onSendHeaders.addListener(
   (details) => {
+    // Capture real page requests only. Replaying our own calls must not make
+    // stale query IDs or credentials appear freshly captured.
+    if (!['https://x.com', 'https://twitter.com'].includes(details.initiator)) return;
     const url = new URL(details.url);
     const headerMap = {};
 
@@ -37,25 +42,20 @@ chrome.webRequest.onSendHeaders.addListener(
     if (match) {
       const [, queryId, operation] = match;
       headerMap[`queryId_${operation}`] = queryId;
+      headerMap[`queryCapturedAt_${operation}`] = Date.now();
     }
 
     // Capture feature flags from query string for later replay.
     const featuresParam = url.searchParams.get('features');
-    if (featuresParam) {
-      headerMap.captured_features = featuresParam;
+    if (featuresParam && match) {
+      headerMap[`features_${match[2]}`] = featuresParam;
     }
 
     if (Object.keys(headerMap).length === 0) return;
 
     // Store captured data namespaced by the logged-in user ID.
-    chrome.storage.local.get('xarchive_user_id', (result) => {
-      const uid = result.xarchive_user_id || 'unknown';
-      const storageKey = `xarchive_creds_${uid}`;
-      chrome.storage.local.get(storageKey, (existing) => {
-        const merged = { ...(existing[storageKey] || {}), ...headerMap, captured_at: Date.now() };
-        chrome.storage.local.set({ [storageKey]: merged });
-      });
-    });
+    getSessionUserId().then(uid => updateCredentials(uid, { ...headerMap, captured_at: Date.now() }))
+      .catch(() => { /* The options page reports missing credentials/storage. */ });
   },
   { urls: ['https://x.com/i/api/graphql/*'], types: ['xmlhttprequest'] },
   ['requestHeaders', 'extraHeaders']
@@ -98,4 +98,3 @@ chrome.runtime.onInstalled.addListener(() => {
     }],
   });
 });
-
