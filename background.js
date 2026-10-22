@@ -15,9 +15,10 @@
  */
 
 import { getSessionUserId, updateCredentials } from './lib/identity.js';
+import { ensureAlarms, runScheduledSource, SOURCES, alarmName } from './lib/scheduled-sync.js';
 
 /** Matches bookmark-related GraphQL operations to capture their query IDs. */
-const GRAPHQL_PATTERN = /\/graphql\/([^/]+)\/(Bookmarks|BookmarkFoldersSlice|BookmarkFolderTimeline)\b/;
+const GRAPHQL_PATTERN = /\/graphql\/([^/]+)\/(Bookmarks|BookmarkFoldersSlice|BookmarkFolderTimeline|Likes)\b/;
 
 /** Auth-related headers to persist for later use by the options page. */
 const CAPTURE_HEADERS = ['authorization', 'x-csrf-token', 'x-client-uuid', 'x-client-transaction-id'];
@@ -97,4 +98,37 @@ chrome.runtime.onInstalled.addListener(() => {
       },
     }],
   });
+  ensureAlarms({ startup: true }).catch(error => console.error('Schedule restore failed', error));
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  ensureAlarms({ startup: true }).catch(error => console.error('Schedule restore failed', error));
+});
+
+let alarmListenerRegistered = false;
+function onScheduledAlarm(alarm) {
+  const source = SOURCES.find(value => alarm.name === alarmName(value));
+  if (source) runScheduledSource(source).catch(error => {
+    console.error('Scheduled sync failed', error);
+    ensureAlarms().catch(recoveryError => console.error('Schedule recovery failed', recoveryError));
+  });
+}
+function registerAlarmListener() {
+  if (!alarmListenerRegistered && chrome.alarms?.onAlarm) {
+    chrome.alarms.onAlarm.addListener(onScheduledAlarm);
+    alarmListenerRegistered = true;
+  }
+}
+registerAlarmListener();
+chrome.permissions.onAdded.addListener(granted => {
+  if (granted.permissions?.includes('alarms')) {
+    registerAlarmListener();
+    ensureAlarms().catch(error => console.error('Schedule permission restore failed', error));
+  }
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'xkeeps:schedule-changed') return;
+  ensureAlarms().then(() => sendResponse({ ok: true }), error => sendResponse({ ok: false, error: error.message }));
+  return true;
 });

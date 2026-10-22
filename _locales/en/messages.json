@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "Xkeeps"
+  },
+  "appDescription": {
+    "message": "Save X bookmarks and likes locally. Search, export and read offline. No additional Xkeeps account required."
+  },
+  "actionTitle": {
+    "message": "Open Xkeeps"
+  }
+}

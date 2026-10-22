@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "admitted_at": "2026-10-22T22:16:28+08:00",
+  "project_name": "Xkeeps-Extension",
+  "decision_outcome": "fork",
+  "files": {
+    ".github/workflows/project-initiation-gate.yml": "ac99fe32f5c96195eb9fe88cbda89b5436801131e54eea48a157d4acb35b66ee",
+    ".project-governance/initiation/github-lhl-tweetxvault.snapshot.json": "2b85c386d14945288a804b4ca811bda6f63799e4d995838ddab7eb3a0644bd1c",
+    ".project-governance/initiation/github-prinsss-twitter-web-exporter.snapshot.json": "127197e91c7adf583228992fb27378a067d94610dca3e7994e7021e527cef75a",
+    ".project-governance/initiation/github-search.snapshot.json": "35088b78437cecad03d1cb0f620961374777225f57375684e5b0a218023838ff",
+    ".project-governance/initiation/github-sytelus-xarchive.snapshot.json": "5d5012cdfb1331e34738e4f227aa064b90fe737e4ed576a88663f9dbb7b6aeef",
+    ".project-governance/initiation/github-zendegani-XClipper.snapshot.json": "f3b5561d4f6c7c48b3cbee5199572240db167b87b4b5699b4347ade9874294c2",
+    ".project-governance/initiation/manifest.json": "c1c408ecf3095e63f3b9eaf3268f6e875ba50e9f3d9444191cc0deb951d0680a",
+    ".project-governance/initiation/manifest.schema.json": "92e241b6a6e69ab39a0e3d5d6894e707b4be7f4d58b2f49b219b07ceb60e56fe",
+    ".project-governance/initiation/pre-project-survey.md": "ad538af9b4ce1dbb804e5df3372812aae2a9d9f95e7059016264093edd82ab1c",
+    ".project-governance/initiation/validate_manifest.py": "2d7101e63e8aa849e8411d3b3e61dd6fbc202242978994dd3d3b11bf78e04d9c",
+    ".project-governance/initiation/verify_bundle.py": "b68eedf73c36bbfb12b51f232180d74a6a4ff5b6e0c16e84f9de629d4815ecb0"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "export_metadata": {
+    "user_id": "9009",
+    "screen_name": "archive_demo",
+    "exported_at": "2026-10-04T04:00:00Z"
+  },
+  "bookmarks": [
+    {
+      "tweet_id": "1009",
+      "status": "available",
+      "created_at": "2026-10-03T18:13:47Z",
+      "full_text": "这是合成视频，用于核验原地播放、暂停和时间显示。\n\n点击预览会出现播放器；“下载视频”仍是独立操作。",
+      "author": {
+        "name": "示例作者",
+        "screen_name": "example_author",
+        "profile_image_url": "https://pbs.twimg.com/xkeeps-synthetic.png"
+      },
+      "media": [
+        {
+          "type": "video",
+          "thumbnail_url": "https://pbs.twimg.com/xkeeps-synthetic-thumb.png",
+          "duration_ms": 3000,
+          "variants": [
+            {
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/xkeeps-synthetic.mp4",
+              "bitrate": 800000
+            }
+          ]
+        },
+        {
+          "type": "photo",
+          "url": "https://pbs.twimg.com/xkeeps-synthetic-photo.png"
+        }
+      ]
+    },
+    {
+      "tweet_id": "1010",
+      "status": "available",
+      "created_at": "2026-10-03T18:13:47Z",
+      "full_text": "第二条合成内容，用于确认列表能够自然延伸。",
+      "author": {
+        "name": "示例作者",
+        "screen_name": "example_author",
+        "profile_image_url": "https://pbs.twimg.com/xkeeps-synthetic.png"
+      },
+      "media": [
+        {
+          "type": "video",
+          "thumbnail_url": "https://pbs.twimg.com/xkeeps-synthetic-thumb.png",
+          "duration_ms": 72000,
+          "variants": [
+            {
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/xkeeps-synthetic.mp4",
+              "bitrate": 800000
+            }
+          ]
+        },
+        {
+          "type": "photo",
+          "url": "https://pbs.twimg.com/xkeeps-synthetic-photo.png"
+        }
+      ]
+    }
+  ],
+  "folders": []
+}

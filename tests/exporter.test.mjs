@@ -25,23 +25,28 @@ test('snapshots preserve scan identity, time, folder IDs and incomplete coverage
 });
 
 test('combined downloads use a safe filename and keep the JSON content', async () => {
-  let downloaded, blob;
+  let downloaded;
   const data = { export_metadata: { kind: 'cumulative' }, bookmarks: [{ tweet_id: '1', full_text: 'text\u2028text' }] };
-  const context = vm.createContext({ VERSION: 'test', Blob, setTimeout() {},
-    URL: { createObjectURL: value => { blob = value; return 'blob:test'; }, revokeObjectURL() {} },
-    chrome: { downloads: { download: (options, callback) => { downloaded = options; callback(); } } },
-  });
+  const context = vm.createContext({ VERSION: 'test', Blob, downloadBlob: async (blob, filename) => { downloaded = { blob, filename, state: 'complete', downloadId: 1 }; return downloaded; } });
   vm.runInContext(code, context);
   const name = await context.downloadJSON(data, '../account');
   assert.match(name, /^xarchive____account_\d{4}-\d{2}-\d{2}_combined\.json$/);
-  assert.equal(downloaded.saveAs, true);
-  assert.deepEqual(JSON.parse(await blob.text()), data);
+  assert.equal(downloaded.filename, name);
+  assert.equal(downloaded.state, 'complete');
+  assert.deepEqual(JSON.parse(await downloaded.blob.text()), data);
 });
 
 test('Chrome download failures are surfaced instead of reporting success', async () => {
-  const context = vm.createContext({ VERSION: 'test', Blob, setTimeout() {}, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, chrome: { runtime: { lastError: { message: 'User canceled' } }, downloads: { download: (options, callback) => callback() } } });
+  const context = vm.createContext({ VERSION: 'test', Blob, downloadBlob: async () => { throw new Error('User canceled'); } });
   vm.runInContext(code, context);
   await assert.rejects(context.downloadJSON({ bookmarks: [] }, 'account'), /User canceled/);
+});
+
+test('unconfirmed JSON downloads retain requested receipts and cannot claim legacy success', async () => {
+  const context = vm.createContext({ VERSION: 'test', Blob, downloadBlob: async (_blob, filename) => ({ filename, state: 'requested', downloadId: 7 }) });
+  vm.runInContext(code, context);
+  assert.equal((await context.downloadJSONReceipt({ bookmarks: [] }, 'account')).state, 'requested');
+  await assert.rejects(context.downloadJSON({ bookmarks: [] }, 'account'), /无法确认下载已完成/);
 });
 
 test('a staged account with no captured handle cannot borrow another account label', async () => {

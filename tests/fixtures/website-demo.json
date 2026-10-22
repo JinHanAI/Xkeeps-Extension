@@ -1,0 +1,89 @@
+{
+  "export_metadata": {
+    "user_id": "42",
+    "screen_name": "xkeeps_demo",
+    "exported_at": "2026-10-12T08:00:00Z"
+  },
+  "bookmarks": [
+    {
+      "tweet_id": "9900001001",
+      "status": "available",
+      "created_at": "2026-10-11T08:30:00Z",
+      "full_text": "值得保存的 AI 研究资料。\n\n尝试新工具之前，先保留来源、核对边界，再验证一条真实工作流程。",
+      "author": {
+        "name": "陈米拉",
+        "screen_name": "mira_notes",
+        "profile_image_url": null
+      },
+      "media": [
+        {
+          "type": "photo",
+          "url": "https://pbs.twimg.com/xkeeps-synthetic-public-photo-1.png"
+        }
+      ],
+      "folders": [
+        "f1"
+      ]
+    },
+    {
+      "tweet_id": "9900001002",
+      "status": "available",
+      "created_at": "2026-10-10T08:30:00Z",
+      "full_text": "一个好用的产品，从一件具体的事开始。\n\n让这件事容易完成，让界面清楚易懂。",
+      "author": {
+        "name": "林知远",
+        "screen_name": "alex_builds",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": [
+        "f1"
+      ]
+    },
+    {
+      "tweet_id": "9900001003",
+      "status": "available",
+      "created_at": "2026-10-09T08:30:00Z",
+      "full_text": "周末阅读清单。\n\n想法能够随时找回，收藏才更有用。",
+      "author": {
+        "name": "许晚晴",
+        "screen_name": "lena_reads",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    },
+    {
+      "tweet_id": "9900001004",
+      "status": "available",
+      "created_at": "2026-10-08T08:30:00Z",
+      "full_text": "AI 工作流笔记。\n\n收集案例，对照输出，把证据与想法放在一起。",
+      "author": {
+        "name": "陈米拉",
+        "screen_name": "mira_notes",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    },
+    {
+      "tweet_id": "9900001005",
+      "status": "available",
+      "created_at": "2026-10-07T08:30:00Z",
+      "full_text": "让屏幕更安静的设计参考。\n\n减少噪声，留出空间，让下一步清楚可见。",
+      "author": {
+        "name": "原野设计",
+        "screen_name": "studio_field",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    }
+  ],
+  "folders": [
+    {
+      "id": "f1",
+      "name": "研究资料"
+    }
+  ]
+}

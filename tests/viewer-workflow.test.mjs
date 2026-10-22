@@ -34,7 +34,7 @@ test('a File import is reviewed before any write, then saves a cumulative archiv
   await context.loadFromFile(new File([JSON.stringify(update)], 'update.json', { type: 'application/json' }));
   assert.equal(writes(), 0);
   assert.equal(element('import-review').open, true);
-  assert.match(element('import-summary').textContent, /1 added.*1 refreshed.*1 older/);
+  assert.match(element('import-summary').textContent, /新增内容 1 条.*更新已有 1 条.*保留内容 1 条/);
   await context.saveImport();
   assert.equal(writes(), 1);
   assert.equal(context.archiveRecord.data.bookmarks.length, 3);
@@ -47,7 +47,7 @@ test('malformed File import leaves the existing archive unchanged', async () => 
   await context.loadFromFile(new File(['{broken'], 'broken.json'));
   assert.equal(writes(), 0);
   assert.equal(context.archiveRecord.data.bookmarks.length, 2);
-  assert.match(element('archive-status').textContent, /Could not import/);
+  assert.match(element('archive-status').textContent, /无法导入/);
 });
 
 test('indexing failures cannot replace the saved data', async () => {
@@ -56,7 +56,7 @@ test('indexing failures cannot replace the saved data', async () => {
   await context.saveImport();
   assert.equal(writes(), 0);
   assert.equal(context.archiveRecord.data.bookmarks.length, 2);
-  assert.match(element('import-error').textContent, /index failed/);
+  assert.match(element('import-error').textContent, /搜索索引未能重建/);
 });
 
 test('storage failures restore the previous view and report unsaved changes', async () => {
@@ -64,7 +64,7 @@ test('storage failures restore the previous view and report unsaved changes', as
   await context.loadFromFile(new File([JSON.stringify(update)], 'update.json'));
   await context.saveImport();
   assert.equal(context.archiveRecord.data.bookmarks.length, 2);
-  assert.match(element('import-error').textContent, /quota exceeded/);
+  assert.match(element('import-error').textContent, /存储空间不足/);
   assert.equal(element('import-review').open, true);
 });
 
@@ -73,8 +73,8 @@ test('undo uses the same explicit review and fails safely on a stale revision', 
   context.archiveRecord.previous = context.archiveRecord.data;
   await context.undoArchive();
   assert.equal(element('import-review').open, true);
-  assert.match(element('import-title').textContent, /Restore previous archive/);
+  assert.match(element('import-title').textContent, /恢复存档/);
   await context.saveImport();
-  assert.match(element('import-error').textContent, /stale revision/);
+  assert.match(element('import-error').textContent, /其他页面发生变化/);
   assert.equal(context.archiveRecord.data.bookmarks.length, 2);
 });

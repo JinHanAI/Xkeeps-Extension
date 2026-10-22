@@ -1,3 +1,5 @@
+import { ExportBatch } from './lib/export-outcome.js';
+import { offerSupport } from './lib/support-ui.js';
 /** Collect staged snapshots and merge into a separate account-scoped archive.
  * Pause/Resume works within an open tab. Interrupted snapshots are recoverable. */
 import './lib/archive.js';
@@ -7,8 +9,13 @@ import { getStoredQueryIds, hasRequiredQueryIds, scrapeQueryIdsFromBundles, capt
 import { fetchAllBookmarks } from './lib/fetcher.js';
 import { fetchAllFolders, fetchFolderContents } from './lib/folders.js';
 import { getBookmarkCount, getAllBookmarks, getAllFolders, getExportState, saveExportState, clearAllData } from './lib/db.js';
-import { assembleExport, downloadJSON } from './lib/exporter.js';
+import { assembleExport, downloadJSONReceipt } from './lib/exporter.js';
+import { buildCsv, buildMarkdown, exportFilename } from './lib/export-formats.js';
+import { downloadBlob } from './lib/downloads.js';
+import { filterPosts, selectedTimeOptions } from './lib/time-range.js';
+import { recommendUpdate, updateRecommendationText, updateSummary, formatUpdateTime } from './lib/update-status.js';
 import { VERSION } from './version.js';
+import { recordEvent, operationId, errorClass } from './lib/analytics.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -42,6 +49,7 @@ let libraryRecord = null;
 let libraryBusy = false;
 let pendingLibraryImport = null;
 let runInfo = null;
+let stagedSnapshotAvailable = false;
 let hasCredentials = false;
 let credentialCheck = null;
 /** Active cooldown countdown interval, if any. Cleared on state transitions. */
@@ -69,6 +77,44 @@ const queryidText = $('queryid-text');
 const userDot = $('user-dot');
 const userText = $('user-text');
 const hintText = $('hint-text');
+const connectionReady = $('connection-ready');
+const connectionConfetti = $('connection-confetti');
+const celebratedAccounts = new Set();
+let connectionRefreshing = false;
+
+function renderConnectionChecklist() {
+  const checks = [
+    [credDot, $('cred-check')],
+    [queryidDot, $('queryid-check')],
+    [userDot, $('user-check')],
+  ];
+  for (const [dot, check] of checks) check.hidden = !dot.classList.contains('ok');
+  const ready = !connectionRefreshing && !!currentUserId && checks.every(([dot]) => dot.classList.contains('ok'));
+  connectionReady.hidden = !ready;
+  if (!ready) { connectionConfetti.replaceChildren(); return; }
+  const key = `xkeeps:connection-ready:${currentUserId}`;
+  let alreadyCelebrated = celebratedAccounts.has(key);
+  try { alreadyCelebrated ||= sessionStorage.getItem(key) === '1'; } catch {}
+  if (alreadyCelebrated) return;
+  celebratedAccounts.add(key);
+  try { sessionStorage.setItem(key, '1'); } catch {}
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const pieces = [[-68,-28],[-51,-45],[-35,-23],[-18,-52],[0,-34],[19,-50],[34,-27],[52,-43],[70,-24],[-43,14],[0,20],[45,16]];
+  const colors = ['#1d9bf0','#00ba7c','#f7c948','#f4212e','#b79aff'];
+  for (const [index, [x, y]] of pieces.entries()) {
+    const piece = document.createElement('span');
+    piece.style.setProperty('--confetti-x', `${x}px`);
+    piece.style.setProperty('--confetti-y', `${y}px`);
+    piece.style.setProperty('--confetti-rotate', `${index % 2 ? -190 : 220}deg`);
+    piece.style.setProperty('--confetti-color', colors[index % colors.length]);
+    connectionConfetti.append(piece);
+  }
+  setTimeout(() => connectionConfetti.replaceChildren(), 950);
+}
+
+$('connection-go-home').addEventListener('click', () => {
+  dispatchEvent(new CustomEvent('xkeeps:navigate', { detail: { page: 'home' } }));
+});
 
 const btnStart = $('btn-start');
 const btnPause = $('btn-pause');
@@ -77,6 +123,7 @@ const btnStop = $('btn-stop');
 
 const progressSection = $('progress-section');
 const statPhase = $('stat-phase');
+const scanLiveStatus = $('scan-live-status');
 const statBookmarks = $('stat-bookmarks');
 const statPages = $('stat-pages');
 const statFolders = $('stat-folders');
@@ -94,10 +141,27 @@ const resultUnavailable = $('result-unavailable');
 const resultUnavailableReasons = $('result-unavailable-reasons');
 const resultFolders = $('result-folders');
 const resultDuration = $('result-duration');
-const btnDownload = $('btn-download');
+const btnExport = $('btn-export');
 
 const logContainer = $('log');
+const logToggle = $('log-toggle');
 const versionInfo = $('version-info');
+
+function runMergedIntoLibrary() {
+  if (!runInfo?.user_id || libraryRecord?.key !== `user:${runInfo.user_id}`) return false;
+  if (runInfo.archive_merged != null) return runInfo.archive_merged === true;
+  // Older scans have no merge flag. Their cumulative archive records the
+  // snapshot's exact completion timestamp when the merge succeeded.
+  return !!runInfo.finished_at && libraryRecord.data.export_metadata?.exported_at === runInfo.finished_at;
+}
+
+function setLogExpanded(expanded) {
+  logToggle.setAttribute('aria-expanded', String(expanded));
+  logContainer.hidden = !expanded;
+  logContainer.style.maxHeight = expanded ? 'none' : '';
+  logContainer.style.overflowY = expanded ? 'visible' : '';
+}
+logToggle.addEventListener('click', () => setLogExpanded(logToggle.getAttribute('aria-expanded') !== 'true'));
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -112,9 +176,52 @@ function log(message, level = 'info') {
   const entry = document.createElement('div');
   entry.className = `log-entry ${level}`;
   const time = new Date().toLocaleTimeString();
-  entry.textContent = `[${time}] ${message}`;
+  entry.textContent = `[${time}] ${logTextZh(message)}`;
   logContainer.appendChild(entry);
   logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function logTextZh(message) {
+  const text = String(message ?? '');
+  let match;
+  if ((match = text.match(/^Found (\d+) bookmark folder\(s\)\.$/))) return `发现 ${match[1]} 个收藏文件夹。`;
+  if (text === 'No bookmark folders returned.') return 'X 未返回收藏文件夹。';
+  if (text === 'Folder list could not be checked completely; previous assignments are kept.') return '文件夹列表未能完整检查；此前的文件夹归属会保留。';
+  if ((match = text.match(/^Fetching folder "(.*)" \((\d+)\/(\d+)\)\.\.\.$/))) return `正在检查文件夹“${match[1]}”（${match[2]}/${match[3]}）…`;
+  if ((match = text.match(/^Folder "(.*)": (\d+) bookmarks\.$/))) return `文件夹“${match[1]}”：已检查 ${match[2]} 条书签。`;
+  if ((match = text.match(/^Folder "(.*)": could not finish checking; previous assignments are kept\.$/))) return `文件夹“${match[1]}”未能检查完毕；此前的归属会保留。`;
+  if ((match = text.match(/^Folder "(.*)": empty\.$/))) return `文件夹“${match[1]}”为空。`;
+  if ((match = text.match(/^No query ID for BookmarkFoldersSlice\. Skipping folders\.$/))) return '未找到文件夹列表接口，跳过文件夹检查。';
+  if (text === 'No query ID for BookmarkFolderTimeline. Skipping folder contents.') return '未找到文件夹书签接口，跳过文件夹内容检查。';
+  if ((match = text.match(/^Stopped: (\d+) consecutive rate limits\. Try again later\.$/))) return `连续 ${match[1]} 次受到请求频率限制，已停止。请稍后重试。`;
+  if ((match = text.match(/^Cooling down for 5 minutes after (\d+) consecutive rate limits\.\.\.$/))) return `连续 ${match[1]} 次受到请求频率限制，等待 5 分钟后继续。`;
+  if ((match = text.match(/^Rate limited \(attempt (\d+)\/(\d+)\)\. Waiting ([\d.]+)s\.\.\.$/))) return `请求频率受限（第 ${match[1]}/${match[2]} 次重试），等待 ${match[3]} 秒。`;
+  if ((match = text.match(/^Auth error \((\d+)\)\. Credentials may have expired\. Visit x\.com to refresh\.$/))) return `X 返回认证错误（HTTP ${match[1]}）。登录信息可能已过期，请打开 X 刷新连接。`;
+  if ((match = text.match(/^X rejected the request \(HTTP (\d+)\)\. Refresh the X connection before retrying; the private API may have changed\.$/))) return `X 拒绝了请求（HTTP ${match[1]}）。请重连账号后重试；X 接口可能发生变化。`;
+  if ((match = text.match(/^Request attempt (\d+)\/(\d+) failed: ([a-z_]+) \((.*)\)\.$/))) {
+    const errors = { network_error: '网络请求失败', http_error: 'HTTP 请求失败', invalid_response: '返回内容无法识别', graphql_error: 'X 查询接口返回错误' };
+    const detail = match[4] ? `（${match[4]}）` : '';
+    return `第 ${match[1]}/${match[2]} 次请求失败：${errors[match[3]] || match[3]}${detail}。`;
+  }
+  if ((match = text.match(/^Failed after (\d+) retries\. Stopping\.$/))) return `连续重试 ${match[1]} 次仍失败，已停止。`;
+  if (text === 'No more pages (no bottom cursor).') return '已到最后一页（没有下一页游标）。';
+  if (text === 'Pagination loop detected (same cursor returned). Stopping.') return '检测到分页游标重复，已停止以避免重复采集。';
+  if ((match = text.match(/^(\d+) consecutive empty pages\. Stopping\.$/))) return `连续 ${match[1]} 页没有返回书签，已停止采集。`;
+  if (text === 'Export stopped by user.') return '已按您的要求停止采集。';
+  if ((match = text.match(/^Page (\d+): (\d+) bookmarks \(total: (\d+)\)$/))) return `第 ${match[1]} 页：本页 ${match[2]} 条书签，累计 ${match[3]} 条。`;
+  if ((match = text.match(/^Page (\d+): empty page \((\d+)\/(\d+)\)$/))) return `第 ${match[1]} 页没有书签（连续空页 ${match[2]}/${match[3]}）。`;
+  if ((match = text.match(/^Looking for query IDs in (\d+) bundles…$/))) return `正在检查 X 页面资源中的查询接口（共 ${match[1]} 个）。`;
+  if (text === 'Opening an X tab briefly to capture current query IDs…') return '正在短暂打开 X 页面，以获取当前查询接口信息…';
+  if (text === 'Current query IDs were not captured. Browse X bookmarks or a folder and try again.') return '暂未取得查询接口信息。请打开 X 收藏页或某个文件夹后重试。';
+  if ((match = text.match(/^Bundle could not be read: (.*)$/))) return `无法读取 X 页面资源：${XArchive.errorTextZh(match[1])}`;
+  if ((match = text.match(/^Query discovery failed: (.*)$/))) return `查询接口发现失败：${XArchive.errorTextZh(match[1])}`;
+  if ((match = text.match(/^Query capture failed: (.*)$/))) return `查询接口捕获失败：${XArchive.errorTextZh(match[1])}`;
+  return text;
+}
+
+function formatQueryOperations(queryIds) {
+  const labels = { Bookmarks: '书签列表', BookmarkFoldersSlice: '收藏夹列表', BookmarkFolderTimeline: '文件夹内容', Likes: '点赞列表' };
+  return Object.keys(queryIds).filter(key => key !== 'Likes').map(key => labels[key] || key).join('、');
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +238,7 @@ function startElapsedTimer() {
     if (elapsedSec > 0) {
       const count = parseInt(statBookmarks.textContent, 10) || 0;
       const perMin = Math.round(count / (elapsedSec / 60));
-      statSpeed.textContent = perMin > 0 ? `${perMin}/min` : '--';
+      statSpeed.textContent = perMin > 0 ? `${perMin} 条/分钟` : '--';
     }
   }, 1000);
 }
@@ -180,8 +287,19 @@ function setUIState(state) {
   btnResume.style.display = state === 'paused' ? '' : 'none';
   btnStop.style.display = running ? '' : 'none';
   progressSection.style.display = running ? '' : 'none';
+  $('log-section').style.display = running || done ? '' : 'none';
   resultSection.style.display = done ? '' : 'none';
+  if (running || done) setLogExpanded(state !== 'complete');
+  scanLiveStatus.hidden = state === 'idle';
+  if (state === 'paused') scanLiveStatus.textContent = '已暂停，可继续更新或停止更新。';
+  else if (state === 'exporting') scanLiveStatus.textContent = statPhase.textContent;
+  else if (done) scanLiveStatus.textContent = state === 'complete' ? '更新完成，请查看结果。' : '更新已结束，请查看结果。';
   updateLibraryButtons();
+}
+
+function updateScanPhase(message) {
+  statPhase.textContent = message;
+  if (exportState === 'exporting') scanLiveStatus.textContent = message;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +319,7 @@ async function checkCredentials() {
 async function readCredentials() {
   const { userId, creds } = await getCredentials();
   const accountChanged = userId !== currentUserId;
-  if (accountChanged) libraryRecord = null;
+  if (accountChanged) { libraryRecord = null; $('connection-refresh-status').textContent = ''; }
   currentUserId = userId;
   currentCreds = creds;
 
@@ -213,10 +331,10 @@ async function readCredentials() {
   // User ID indicator
   if (userId) {
     userDot.className = 'status-dot ok';
-    userText.textContent = currentScreenName ? `@${currentScreenName} (${userId})` : `User ID: ${userId}`;
+    userText.textContent = currentScreenName ? `当前账号：@${currentScreenName}` : `当前账号ID：${userId}`;
   } else {
-    userDot.className = 'status-dot error';
-    userText.textContent = 'No user session detected';
+  userDot.className = 'status-dot error';
+  userText.textContent = '尚未登录。请先登录X账号。';
   }
 
   // Auth credentials indicator
@@ -224,14 +342,14 @@ async function readCredentials() {
   if (ct0 && (creds?.authorization || creds?.['x-csrf-token'])) {
     credDot.className = 'status-dot ok';
     const age = creds.captured_at ? Math.round((Date.now() - creds.captured_at) / 60_000) : '?';
-    credText.textContent = `Credentials captured (${age} min ago)`;
+    credText.textContent = `连接已保存（${age}分钟前）`;
   } else {
     if (ct0) {
       credDot.className = 'status-dot waiting';
-      credText.textContent = 'Cookie found but full headers not captured yet';
+      credText.textContent = '已找到登录Cookie，等待捕获完整请求信息';
     } else {
       credDot.className = 'status-dot error';
-      credText.textContent = 'No credentials captured';
+      credText.textContent = '尚未捕获连接信息，请登录并浏览 X';
     }
   }
 
@@ -239,20 +357,20 @@ async function readCredentials() {
   currentQueryIds = getStoredQueryIds(creds);
   if (hasRequiredQueryIds(currentQueryIds)) {
     queryidDot.className = 'status-dot ok';
-    const ops = Object.keys(currentQueryIds).join(', ');
-    queryidText.textContent = `Query IDs: ${ops}`;
+    const ops = formatQueryOperations(currentQueryIds);
+    queryidText.textContent = `读取已就绪：${ops}`;
   } else {
     queryidDot.className = 'status-dot waiting';
-    queryidText.textContent = 'Query IDs not yet captured (auto-discovered on export start)';
+    queryidText.textContent = '开始更新时会自动准备。';
   }
 
   // Actionable hints
   const hints = [];
   if (!userId || !creds?.authorization) {
-    hints.push('Browse x.com while logged in to capture credentials.');
+    hints.push('请先登录 X 并打开任意 X 页面，以建立连接。');
   }
   if (!hasRequiredQueryIds(currentQueryIds)) {
-    hints.push('Query IDs will be auto-discovered when you start an update.');
+    hints.push('查询接口信息会在开始更新时自动获取，无需手动填写。');
   }
 
   if (hints.length > 0) {
@@ -265,6 +383,7 @@ async function readCredentials() {
   // Enable Start when we have at least some credentials.
   hasCredentials = !!ct0 && !!userId;
   btnStart.disabled = !hasCredentials || libraryBusy;
+  renderConnectionChecklist();
   if (accountChanged) await loadLibrary();
 }
 
@@ -279,11 +398,17 @@ async function readCredentials() {
 async function checkPriorExport() {
   await navigator.locks.request('xarchive-export', { ifAvailable: true }, async lock => {
   if (!lock) {
-    log('Another extension tab is collecting data. Use that tab to pause or stop it.', 'warn');
+    log('另一个扩展页面正在采集，请切换到该页面暂停或停止。', 'warn');
     return;
   }
   runInfo = await getExportState('run_info');
   const count = await getBookmarkCount();
+  stagedSnapshotAvailable = !!runInfo && (count > 0 || !!runInfo.finished_at) && runInfo.user_id === currentUserId;
+  if (runInfo?.user_id !== currentUserId) {
+    resultSection.style.display = 'none';
+    updateLibraryButtons();
+    return;
+  }
   if (count > 0 || runInfo) {
     if (runInfo && !runInfo.finished_at) {
       runInfo.collection.reason = 'tab_interrupted';
@@ -309,23 +434,37 @@ async function runExport() {
   libraryBusy = true;
   updateLibraryButtons();
   try { await navigator.locks.request('xarchive-export', { ifAvailable: true }, async lock => {
-    if (!lock) { log('An update is already running in another extension tab. Use that tab or wait for it to finish.', 'warn'); return; }
+    if (!lock) { log('另一个扩展页面正在更新，请切换到该页面操作或等待完成。', 'warn'); return; }
     await checkCredentials();
     await loadLibrary();
     if (!hasCredentials) return;
     const mode = $('update-mode').value;
-    if (mode === 'quick' && !libraryRecord?.data.bookmarks.length) { log('Start with a full refresh or import an existing archive before using Quick update.', 'warn'); return; }
+    if (mode === 'quick' && !libraryRecord?.data.bookmarks.length) { log('请先全量刷新或导入已有存档，再进行增量更新。', 'warn'); return; }
+    logContainer.replaceChildren();
+    updateScanPhase(mode === 'full' ? '正在准备全量扫描：确认账号与接口，随后检查全部收藏和文件夹。'
+      : mode === 'quick' ? '正在准备近期更新…'
+        : '正在准备限量试采：确认账号与接口，最多读取 3 条书签。');
     setUIState('exporting');
     stopRequested = false;
     startElapsedTimer();
+    statElapsed.textContent = '0:00';
     statBookmarks.textContent = '0';
     statPages.textContent = '0';
+    statFolders.textContent = '--';
+    statSpeed.textContent = '--';
     runInfo = {
       user_id: currentUserId, screen_name: currentScreenName,
+      archive_merged: false,
+      archive_before_count: libraryRecord?.data.bookmarks.length || 0,
+      archive_before_at: libraryRecord?.data.export_metadata?.exported_at || null,
       started_at: new Date().toISOString(),
       observed_at: new Date().toISOString(),
       collection: { mode, bookmarks: 'partial', folders: 'unknown', folder_list: 'unknown', folder_contents: {}, reason: 'in_progress' },
     };
+    const telemetryId = operationId();
+    const telemetryStart = Date.now();
+    let telemetryResult = 'error';
+    recordEvent('archive_update_started', { source: 'bookmarks', mode }, telemetryId);
     let staged = false;
     try {
       await verifyRunAccount();
@@ -335,7 +474,7 @@ async function runExport() {
       await runExportInner();
     } catch (err) {
       runInfo.collection.reason = 'error';
-      log(`Update interrupted: ${err.message}. Previously saved content is preserved.`, 'error');
+      log(`更新中断：${XArchive.errorTextZh(err.message).replace(/[。.!?]+$/u, '')}。已保存的历史内容保持不变。`, 'error');
     } finally {
       if (pauseGate) { pauseGate.resolve(); pauseGate = null; }
       runInfo.finished_at = new Date().toISOString();
@@ -345,21 +484,31 @@ async function runExport() {
         if (staged) {
           await persistRun();
           await mergeCollectedSnapshot();
+          await saveExportState('run_info', { ...runInfo, archive_merged: true });
+          runInfo.archive_merged = true;
           await showResult(runInfo.collection.bookmarks === 'complete' ? 'complete' : 'stopped');
+          telemetryResult = runInfo.collection.bookmarks === 'complete' ? 'success'
+            : runInfo.collection.reason === 'user_stopped' ? 'cancelled' : runInfo.collection.reason === 'error' ? 'error' : 'partial';
         } else setUIState('idle');
       } catch (err) {
         const saved = libraryRecord !== archiveBefore;
-        log(saved ? `Archive saved, but result details could not refresh: ${err.message}. Reopen this page to load the saved archive.` : `Could not save the update: ${err.message}. Download the collected snapshot, then retry merging it.`, 'error');
+        log(saved ? `存档已保存，但结果信息未能刷新：${XArchive.errorTextZh(err.message)}。重新打开此页面可读取存档。` : `更新未能保存：${XArchive.errorTextZh(err.message)}。请先下载本次快照，再重试合并。`, 'error');
         try { await showResult('stopped'); }
         catch {
           for (const el of [resultTotal, resultAvailable, resultUnavailable, resultFolders, resultDuration]) el.textContent = '—';
           resultUnavailableReasons.style.display = 'none';
         }
         setUIState('stopped');
-        resultHeading.textContent = saved ? 'Archive saved; reload to refresh details' : 'Collected snapshot needs recovery';
-        $('result-coverage').textContent = saved ? 'Your updated archive is saved. Reopen this page to refresh its details and download the combined JSON.' : 'The saved archive was not updated. Download the latest snapshot to preserve collected data, or retry Merge collected snapshot.';
+        resultHeading.textContent = saved ? '存档已保存，刷新页面可更新详情' : '本次读取结果需要恢复';
+        $('result-coverage').textContent = saved ? '更新后的存档已保存。重新打开此页面可刷新详情并导出累计存档。' : '累计存档未更新。请下载本次快照保留结果，或重试“保存结果”。';
       }
       stopElapsedTimer();
+      recordEvent('archive_update_completed', { source: 'bookmarks', mode,
+        result: telemetryResult,
+        item_count: Number(statBookmarks.textContent) || 0,
+        page_count: Number(statPages.textContent) || 0,
+        duration_ms: Date.now() - telemetryStart,
+      }, telemetryId);
     }
   }); } finally { libraryBusy = false; updateLibraryButtons(); }
 }
@@ -373,7 +522,7 @@ async function verifyRunAccount() {
   const { userId } = await getCredentials();
   const cookie = await chrome.cookies.get({ url: 'https://x.com', name: 'twid' });
   const cookieId = decodeURIComponent(cookie?.value || '').replaceAll('"', '').replace(/^u=/, '');
-  if (userId !== runInfo.user_id || cookieId !== runInfo.user_id) throw new Error('The signed-in X account changed or could not be verified. Return to the original account before starting another update.');
+  if (userId !== runInfo.user_id || cookieId !== runInfo.user_id) throw new Error('登录的 X 账号已变更或无法验证。请切换回原账号后再开始更新。');
 }
 
 /** Folder-related operations whose IDs are desirable but not required. */
@@ -403,7 +552,7 @@ async function discoverQueryIds() {
   // find it in the compiled JS.
   const allFound = FOLDER_OPERATIONS.every((op) => currentQueryIds[op]);
   if (!hasRequiredQueryIds(currentQueryIds) || !allFound) {
-    log('Scraping JS bundles for remaining query IDs...', 'info');
+    log('正在从 X 页面获取缺少的查询接口信息…', 'info');
     const scraped = await scrapeQueryIdsFromBundles(log, control);
     if (scraped) {
       currentQueryIds = { ...currentQueryIds, ...scraped };
@@ -412,10 +561,11 @@ async function discoverQueryIds() {
   }
 
   if (hasRequiredQueryIds(currentQueryIds)) {
-    const ops = Object.keys(currentQueryIds).join(', ');
-    log(`Query IDs ready: ${ops}`, 'success');
+    const ops = formatQueryOperations(currentQueryIds);
+    log(`读取已就绪：${ops}`, 'success');
     queryidDot.className = 'status-dot ok';
-    queryidText.textContent = `Query IDs: ${ops}`;
+    queryidText.textContent = `读取已就绪：${ops}`;
+    renderConnectionChecklist();
   }
 }
 
@@ -424,9 +574,15 @@ async function discoverQueryIds() {
  * a single try/catch/finally.
  */
 async function runExportInner() {
-  if (!hasRequiredQueryIds(currentQueryIds) || (runInfo.collection.mode === 'full' && FOLDER_OPERATIONS.some(op => !currentQueryIds[op]))) await discoverQueryIds();
+  if (runInfo.collection.mode === 'sample' && !hasRequiredQueryIds(currentQueryIds)) {
+    log('限量试采仅从 X 页面资源查找接口，不打开收藏页。', 'info');
+    const scraped = await scrapeQueryIdsFromBundles(log, { shouldStop: () => stopRequested, shouldPause });
+    if (scraped) { currentQueryIds = { ...currentQueryIds, ...scraped }; await storeQueryIds(currentUserId, scraped); }
+  } else if (!hasRequiredQueryIds(currentQueryIds) || (runInfo.collection.mode === 'full' && FOLDER_OPERATIONS.some(op => !currentQueryIds[op]))) await discoverQueryIds();
   if (stopRequested) { runInfo.collection.reason = 'user_stopped'; return; }
-  if (!hasRequiredQueryIds(currentQueryIds)) throw new Error('Could not discover Bookmarks query ID. Browse your X bookmarks and retry.');
+  if (!hasRequiredQueryIds(currentQueryIds)) throw new Error(runInfo.collection.mode === 'sample'
+    ? '未能从 X 页面资源取得书签接口信息；限量试采没有发送书签请求。'
+    : '未能获取书签查询接口。请先打开 X 收藏页，确认登录后重试。');
   // Discovery may have captured a fresh session header set.
   currentCreds = (await getCredentials()).creds;
   const callbacks = {
@@ -445,7 +601,7 @@ async function runExportInner() {
     },
   };
   if (runInfo.collection.mode === 'full') {
-    statPhase.textContent = 'Checking folders';
+    updateScanPhase('正在检查文件夹');
     const folderResult = await fetchAllFolders({ queryId: currentQueryIds.BookmarkFoldersSlice, creds: currentCreds, ...callbacks });
     runInfo.collection.folder_list = folderResult.complete ? 'complete' : 'partial';
     const folders = folderResult.folders;
@@ -459,20 +615,21 @@ async function runExportInner() {
     await waitForCollection(BASE_DELAY_MS, () => stopRequested);
     if (!stopRequested) await fetchFolderContents({
       folders, queryId: currentQueryIds.BookmarkFolderTimeline, creds: currentCreds, ...callbacks,
-      onFolderProgress: (index, total, name) => { statFolders.textContent = `${index}/${total}`; statPhase.textContent = `Folder: ${name}`; },
+      onFolderProgress: (index, total, name) => { statFolders.textContent = `${index}/${total}`; updateScanPhase(`文件夹：${name}`); },
       onCoverage: async coverage => { runInfo.collection.folder_contents = coverage; await persistRun(); },
     });
     runInfo.collection.folders = folderResult.complete && folders.every(f => runInfo.collection.folder_contents[f.id] === 'complete') ? 'complete' : 'partial';
     await persistRun();
     await waitForCollection(BASE_DELAY_MS, () => stopRequested);
   } else {
-    statFolders.textContent = 'Not checked';
-    log('Quick update checks recent pages until a whole page is already archived. Older bookmarks and folders are not refreshed.', 'warn');
+    statFolders.textContent = '未检查';
+    log(runInfo.collection.mode === 'sample' ? '限量试采只请求一页最多 3 条，不检查文件夹；结果始终是仅查部分。' : '增量更新只检查近期页面；较早书签和文件夹变化不会检查。定期全量刷新可补查。', 'warn');
   }
   if (stopRequested) { runInfo.collection.reason = 'user_stopped'; return; }
-  statPhase.textContent = runInfo.collection.mode === 'quick' ? 'Checking recent bookmarks' : 'Checking all bookmarks';
+  updateScanPhase(runInfo.collection.mode === 'sample' ? '正在限量试采' : runInfo.collection.mode === 'quick' ? '正在检查近期收藏' : '正在检查全部收藏');
   const result = await fetchAllBookmarks({
     queryId: currentQueryIds.Bookmarks, creds: currentCreds, ...callbacks,
+    ...(runInfo.collection.mode === 'sample' ? { count: 3, maxPages: 1, maxAttempts: 1, maxBookmarks: 3 } : {}),
     knownIds: runInfo.collection.mode === 'quick' ? new Set(libraryRecord.data.bookmarks.map(b => b.tweet_id)) : undefined,
     onPage: async (tweets, pageNum) => {
       statBookmarks.textContent = String(await getBookmarkCount());
@@ -500,30 +657,59 @@ async function showResult(reason) {
   const available = bookmarks.filter((b) => b.status === 'available').length;
   const unavailableList = bookmarks.filter((b) => b.status === 'unavailable');
   const elapsed = await getElapsedSeconds();
+  stagedSnapshotAvailable = !!runInfo && runInfo.user_id === currentUserId && (bookmarks.length > 0 || !!runInfo.finished_at);
 
-  resultHeading.textContent = runInfo?.collection.mode === 'quick' && runInfo?.collection.reason === 'quick_boundary' ? 'Quick update finished' : reason === 'complete' ? 'Bookmark scan finished' : 'Partial snapshot available';
-  $('result-coverage').textContent = XArchive.describeCoverage({ export_metadata: { collection: runInfo?.collection } });
-  $('result-account').textContent = runInfo?.user_id ? `Snapshot account: ${runInfo.screen_name ? '@' + runInfo.screen_name + ' · ' : ''}${runInfo.user_id}` : 'Legacy snapshot: account identity was not recorded. Download and open it separately in the viewer.';
-  $('btn-recover').disabled = !runInfo?.user_id || runInfo.user_id !== currentUserId;
+  const merged = runMergedIntoLibrary();
+  resultHeading.textContent = merged && successfullyCompletedRun()
+    ? (runInfo.collection.mode === 'quick' ? '更新完成' : '更新完成')
+    : merged ? '部分保存' : reason === 'complete' ? '采集完成，待合并' : '部分保存';
+  $('result-coverage').textContent = coverageSummary({ export_metadata: { collection: runInfo?.collection } });
+  let transition = runInfo?.update_summary;
+  if (!transition && merged && libraryRecord?.previous
+      && libraryRecord.data.export_metadata?.exported_at === runInfo.finished_at) {
+    const snapshot = await assembleExport({ userId: runInfo.user_id, screenName: runInfo.screen_name, durationSeconds: elapsed });
+    const mergedResult = XArchive.merge(libraryRecord.previous, snapshot);
+    transition = updateSummary(libraryRecord.previous.bookmarks.length, libraryRecord.previous.export_metadata?.exported_at,
+      libraryRecord.data.bookmarks.length, runInfo.finished_at, mergedResult.summary);
+  }
+  const transitionReady = merged && !!transition;
+  $('result-transition').hidden = !transitionReady;
+  $('result-observations').hidden = transitionReady;
+  if (transitionReady) {
+    $('result-before').textContent = transition.before_count.toLocaleString();
+    $('result-after').textContent = transition.after_count.toLocaleString();
+    $('result-changes').textContent = `新增内容 ${transition.added.toLocaleString()} 条 · 更新已有 ${transition.updated.toLocaleString()} 条`;
+    const en = globalThis.XKeepsI18n?.language === 'en';
+    const beforeTime = !transition.before_at && transition.before_count === 0 ? (en ? 'First collection' : '首次获取') : formatUpdateTime(transition.before_at, en);
+    $('result-update-time').textContent = `更新时间：${beforeTime} → ${formatUpdateTime(transition.finished_at, en)}`;
+    $('result-coverage').hidden = successfullyCompletedRun();
+  } else $('result-coverage').hidden = false;
+  $('result-account').textContent = runInfo?.user_id ? `更新账号：${runInfo.screen_name ? '@' + runInfo.screen_name : '昵称尚未识别'}` : '旧快照未记录账号身份；请下载后在查看器中单独打开。';
+  $('btn-recover').textContent = merged ? '已保存' : '保存结果';
+  $('btn-recover').hidden = merged;
+  $('btn-recover').disabled = merged || !runInfo?.user_id || runInfo.user_id !== currentUserId;
+  $('result-help').textContent = merged
+    ? '' : '本次结果尚未合并；可在此恢复已采集内容。';
+  $('result-help').hidden = merged;
   resultTotal.textContent = String(bookmarks.length);
   resultAvailable.textContent = String(available);
   resultUnavailable.textContent = String(unavailableList.length);
   resultFolders.textContent = String(folders.length);
-  $('result-folder-summary').style.display = runInfo?.collection.mode === 'quick' ? 'none' : '';
+  $('result-folder-summary').style.display = ['quick', 'sample'].includes(runInfo?.collection.mode) ? 'none' : '';
   resultDuration.textContent = formatTime(elapsed);
 
   // Show breakdown of unavailable reasons.
   if (unavailableList.length > 0) {
     const counts = Object.create(null);
     for (const bm of unavailableList) {
-      const r = bm.unavailable_reason || 'Unknown';
+      const r = bm.unavailable_reason || '原因未知';
       counts[r] = (counts[r] || 0) + 1;
     }
     resultUnavailableReasons.innerHTML = '';
     resultUnavailableReasons.className = 'unavailable-reasons';
     for (const [r, n] of Object.entries(counts)) {
       const div = document.createElement('div');
-      div.textContent = `${n}x ${r}`;
+      div.textContent = `${n} 条：${r}`;
       resultUnavailableReasons.appendChild(div);
     }
     resultUnavailableReasons.style.display = '';
@@ -531,21 +717,96 @@ async function showResult(reason) {
     resultUnavailableReasons.style.display = 'none';
   }
 
-  setUIState(reason);
+  const successfullyMerged = merged && successfullyCompletedRun();
+  setUIState(successfullyMerged ? 'complete' : reason === 'complete' ? 'stopped' : reason);
+  // Default once per completed snapshot; later manual scope choices stay put.
+  const range = $('export-range');
+  const snapshotKey = `${runInfo?.user_id}:${runInfo?.finished_at}`;
+  if (successfullyMerged && range.dataset.latestSnapshot !== snapshotKey) {
+    range.dataset.latestSnapshot = snapshotKey;
+    range.value = 'snapshot';
+    range.dispatchEvent(new Event('change'));
+  }
+}
+
+function successfullyCompletedRun() {
+  const collection = runInfo?.collection;
+  return collection?.mode === 'quick' ? ['complete', 'quick_boundary'].includes(collection.reason)
+    : collection?.reason === 'complete' && XArchive.isComplete({ export_metadata: { collection } });
 }
 
 // ---------------------------------------------------------------------------
 // Download handler
 // ---------------------------------------------------------------------------
 
-async function handleDownload() {
+async function handleSelectedExport(request = {}) {
+  const batch = new ExportBatch({ operationId: request.operationId || operationId(), entry: 'home', itemCount: 0 });
+  const button = btnExport;
+  const originalLabel = button.textContent;
+  const telemetryId = batch.outcome.operationId;
+  const telemetryStart = Date.now();
+  const telemetry = { source: 'bookmarks', format: $('export-format').value,
+    scope: $('export-range').value === 'cumulative' ? 'cumulative' : 'snapshot',
+    period: $('export-time')?.querySelector('.selected')?.dataset.period || 'all' };
+  recordEvent('archive_export_started', telemetry, telemetryId);
+  button.disabled = true;
+  button.textContent = '正在准备导出…';
+  $('export-status').textContent = '正在准备文件，请在Chrome下载对话框中选择保存位置。';
+  try {
   await navigator.locks.request('xarchive-export', { ifAvailable: true }, async lock => {
-    if (!lock) { log('A scan is running in another tab. Wait for it to finish before downloading its snapshot.', 'warn'); return; }
-    runInfo = await getExportState('run_info');
-    const data = await assembleExport({ userId: runInfo?.user_id, screenName: runInfo?.screen_name, durationSeconds: await getElapsedSeconds() });
-    const filename = await downloadJSON(data, data.export_metadata.screen_name || data.export_metadata.user_id);
-    log(`Download requested: ${filename}. Check your browser downloads for completion.`, 'success');
+    if (!lock) throw new Error('另一个页面正在采集。请等待采集结束后再导出。');
+    const range = $('export-range').value;
+    const format = request.format || $('export-format').value;
+    let data;
+    if (request.document) data = structuredClone(request.document);
+    else if (range === 'cumulative') {
+      if (!libraryRecord) throw new Error('当前账号还没有累计存档，请先导入JSON或全部更新。');
+      data = structuredClone(libraryRecord.data);
+    } else {
+      runInfo = await getExportState('run_info');
+      const count = await getBookmarkCount();
+      if (!runInfo?.finished_at || runInfo.user_id !== currentUserId || (!count && runInfo.collection?.bookmarks !== 'complete')) {
+        throw new Error('当前账号没有可导出的采集快照；请先完成或停止一次采集。');
+      }
+      data = await assembleExport({ userId: runInfo.user_id, screenName: runInfo.screen_name, durationSeconds: await getElapsedSeconds() });
+    }
+    const chosenTime = selectedTimeOptions($('export-time'));
+    if (!request.document) data = filterPosts(data, chosenTime.period, chosenTime);
+    batch.outcome.itemCount = data.bookmarks.length;
+    batch.require(format);
+    const filename = exportFilename(data, format);
+    if (format === 'json') {
+      const receipt = await downloadJSONReceipt(data, data.export_metadata?.screen_name || data.export_metadata?.user_id, filename,
+        { userId: currentUserId, source: 'bookmarks' });
+      batch.saved(format, receipt);
+      if (receipt.state !== 'complete') throw new Error('浏览器无法确认下载已完成，请检查下载列表。');
+    } else {
+      const exportedAt = new Date().toISOString();
+      const body = format === 'csv' ? buildCsv(data, { exportedAt }) : buildMarkdown(data, { exportedAt });
+      const mime = format === 'csv' ? 'text/csv;charset=utf-8' : 'text/markdown;charset=utf-8';
+      const result = await downloadBlob(new Blob([body], { type: mime }), filename,
+        { userId: currentUserId, source: 'bookmarks' });
+      batch.saved(format, result);
+      if (result.state !== 'complete') throw new Error('浏览器无法确认下载已完成，请检查下载列表。');
+    }
+    $('export-status').textContent = `下载完成：${filename}（${data.bookmarks.length.toLocaleString()} 条）。`;
+    log(`导出完成：${filename}，${data.bookmarks.length.toLocaleString()} 条。`, 'success');
+    recordEvent('archive_export_completed', { ...telemetry, item_count: data.bookmarks.length,
+      duration_ms: Date.now() - telemetryStart, result: 'success' }, telemetryId);
   });
+  const outcome = batch.finish();
+  if (!request.operationId) await offerSupport(outcome, $('export-status'));
+  return outcome;
+  } catch (error) {
+    recordEvent('archive_export_completed', { ...telemetry, duration_ms: Date.now() - telemetryStart,
+      result: 'error', error_class: errorClass(error) }, telemetryId);
+    $('export-status').textContent = `导出未完成：${XArchive.errorTextZh(error.message)}。存档数据保持不变，可检查后重试。`;
+    log(`导出未完成：${XArchive.errorTextZh(error.message)}`, 'error');
+    return batch.finish(error.name === 'AbortError' ? 'cancelled' : 'error');
+  } finally {
+    button.textContent = originalLabel;
+    updateLibraryButtons();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -561,6 +822,14 @@ function formatTime(totalSeconds) {
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function archiveSummary(summary) {
+  return XArchive.summaryTextZh(summary);
+}
+
+function coverageSummary(data) {
+  return XArchive.describeCoverageZh(data);
 }
 
 /**
@@ -586,18 +855,31 @@ function updateLibraryButtons() {
   const busy = running || libraryBusy || !!pendingLibraryImport;
   $('btn-import').disabled = busy || !currentUserId;
   $('btn-connection').disabled = busy || !currentUserId;
-  $('btn-combined').disabled = busy || !libraryRecord;
   $('btn-undo').disabled = busy || !libraryRecord?.previous;
-  $('btn-download').disabled = busy;
-  $('btn-recover').disabled = busy || !runInfo?.user_id || runInfo.user_id !== currentUserId;
+  const snapshotSelected = $('export-range').value === 'snapshot';
+  $('export-range').querySelector('[value="snapshot"]').disabled = !stagedSnapshotAvailable;
+  if (snapshotSelected && !stagedSnapshotAvailable) $('export-range').value = 'cumulative';
+  const selectedSnapshot = $('export-range').value === 'snapshot';
+  const exportAvailable = selectedSnapshot ? stagedSnapshotAvailable : !!libraryRecord;
+  btnExport.disabled = busy || !exportAvailable;
+  if (!busy) btnExport.textContent = `下载 ${{ json: 'JSON', csv: 'CSV', markdown: 'Markdown' }[$('export-format').value]}`;
+  $('btn-recover').disabled = busy || runMergedIntoLibrary() || !runInfo?.user_id || runInfo.user_id !== currentUserId;
   $('update-mode').disabled = busy;
   $('update-mode').querySelector('[value="quick"]').disabled = !libraryRecord?.data.bookmarks.length;
-  if (!libraryRecord?.data.bookmarks.length) $('update-mode').value = 'full';
+  if (!libraryRecord?.data.bookmarks.length && $('update-mode').value === 'quick') $('update-mode').value = 'full';
+  else if (libraryRecord && !$('update-mode').dataset.userSelected) {
+    $('update-mode').value = recommendUpdate(libraryUpdateStatus()).mode;
+  }
   btnStart.disabled = busy || !hasCredentials;
-  btnStart.textContent = $('update-mode').value === 'quick' ? 'Quick update' : 'Full refresh';
-  $('mode-help').textContent = $('update-mode').value === 'quick'
-    ? 'Checks recent pages until an entire page is already archived. Older changes may be missed and folders are not checked. Run a full refresh regularly. Saved content stays. Keep this tab open.'
-    : 'Checks every page and folder. Adds and refreshes collected bookmarks while preserving older saved content. Your previous archive stays saved until the merge succeeds. Keep this tab open.';
+  btnStart.textContent = $('update-mode').value === 'sample' ? '开始限量试采' : $('update-mode').value === 'quick' ? '近期更新' : '全部更新';
+  $('mode-help').textContent = $('update-mode').value === 'sample'
+    ? '只请求一页、最多 3 条书签，不检查文件夹，不重试；结果标记为仅查部分。适合小范围连接测试，不能代替增量或全量刷新。'
+    : $('update-mode').value === 'quick'
+    ? '检查近期收藏，保留已有记录。\n较早内容和文件夹请用全部更新检查。'
+    : '检查全部可访问收藏和文件夹。\n更新时请保持此页打开。';
+  $('export-range').disabled = busy;
+  $('export-format').disabled = busy;
+  $('export-status').textContent ||= '选择导出范围和格式。';
 }
 
 async function loadLibrary() {
@@ -609,71 +891,119 @@ async function loadLibrary() {
 }
 
 function showLibrary(message) {
-  $('library-status').textContent = message || (libraryRecord
-    ? `${libraryRecord.data.bookmarks.length.toLocaleString()} saved bookmarks for ${currentScreenName ? '@' + currentScreenName : currentUserId}. Updates preserve this archive.`
-    : currentUserId ? 'No saved archive for this account yet. Import your earlier JSON, or start a full refresh.' : 'Browse X while signed in to choose the account for this archive.');
-  const full = libraryRecord?.data.archive_metadata?.last_full_refresh_at;
-  const overdue = !full || Date.now() - Date.parse(full) > 7 * 24 * 60 * 60 * 1000;
-  $('library-refresh').textContent = (full ? `Last complete full refresh: ${new Date(full).toLocaleString()}. ` : 'No verified complete full refresh yet. ')
-    + (overdue ? 'A full refresh is recommended to check older bookmarks and folder changes.' : 'Quick updates can miss older changes. Full refresh checks the entire collection.');
+  $('library-status').hidden = !message || message.startsWith('存档已保存。');
+  $('library-status').textContent = message || '';
+  if (!$('update-mode').dataset.userSelected) $('update-mode').value = recommendUpdate(libraryUpdateStatus()).mode;
+  $('library-refresh').textContent = updateRecommendationText(libraryUpdateStatus(), globalThis.XKeepsI18n?.language === 'en');
   updateLibraryButtons();
+  globalThis.dispatchEvent?.(new Event('xkeeps:archive-changed'));
 }
 
+function libraryUpdateStatus() {
+  return { count: libraryRecord?.data.bookmarks.length || 0,
+    lastFullAt: libraryRecord?.data.archive_metadata?.last_full_refresh_at,
+    lastUpdatedAt: libraryRecord?.data.export_metadata?.exported_at };
+}
+window.addEventListener('xkeeps:language-changed', () => {
+  $('library-refresh').textContent = updateRecommendationText(libraryUpdateStatus(), globalThis.XKeepsI18n?.language === 'en');
+});
+
 async function mergeCollectedSnapshot() {
-  if (!runInfo?.user_id || runInfo.user_id !== currentUserId) throw new Error('This snapshot belongs to a different or unidentified account. Sign in to its account, or download it and open it separately in the viewer.');
+  if (!runInfo?.user_id || runInfo.user_id !== currentUserId) throw new Error('此快照属于其他账号或未记录账号。请切换到对应账号，或下载后在查看器中单独打开。');
   const snapshot = await assembleExport({ userId: runInfo.user_id, screenName: runInfo.screen_name, durationSeconds: await getElapsedSeconds() });
   if (!snapshot.bookmarks.length && snapshot.export_metadata.collection.bookmarks !== 'complete') {
-    showLibrary('No bookmarks were collected. Your saved archive is unchanged.');
+    runInfo.update_summary = updateSummary(runInfo.archive_before_count ?? libraryRecord?.data.bookmarks.length ?? 0,
+      runInfo.archive_before_at, libraryRecord?.data.bookmarks.length || 0, runInfo.finished_at);
+    showLibrary(`本次没有采集到书签，累计存档保持不变。当前账号仍保存 ${libraryRecord?.data.bookmarks.length || 0} 条书签。`);
     return;
   }
   const result = XArchive.merge(libraryRecord?.data, snapshot);
+  const beforeCount = libraryRecord?.data.bookmarks.length || 0;
+  const beforeAt = libraryRecord?.data.export_metadata?.exported_at;
   if (result.changed) libraryRecord = await archiveStore.save(`user:${runInfo.user_id}`, result.data, libraryRecord?.revision || 0);
-  showLibrary(result.changed ? `Archive saved. ${XArchive.summaryText(result.summary)}. Download the combined archive for your viewer and backup.` : 'This snapshot is already merged. Your archive and undo copy are unchanged.');
-  log(XArchive.summaryText(result.summary), 'success');
+  runInfo.update_summary = updateSummary(runInfo.archive_before_count ?? beforeCount,
+    runInfo.archive_before_at ?? beforeAt, libraryRecord?.data.bookmarks.length || 0, runInfo.finished_at, result.summary);
+  showLibrary(result.changed ? `存档已保存。${archiveSummary(result.summary)}。` : '此快照已合并，累计存档和撤销副本均未改变。');
+  log(archiveSummary(result.summary), 'success');
 }
 
-$('update-mode').addEventListener('change', updateLibraryButtons);
+$('update-mode').addEventListener('change', () => {
+  $('update-mode').dataset.userSelected = 'true';
+  updateLibraryButtons();
+});
+function updateExportChoice() {
+  updateLibraryButtons();
+  const range = $('export-range').value === 'snapshot' ? '最近获取' : '全部内容';
+  $('export-status').textContent = `将下载${range}的${{ json: 'JSON', csv: 'CSV', markdown: 'Markdown' }[$('export-format').value]}文件。`;
+}
+$('export-range').addEventListener('change', updateExportChoice);
+$('export-format').addEventListener('change', updateExportChoice);
 $('btn-connection').addEventListener('click', async () => {
   if (libraryBusy) return;
   libraryBusy = true;
+  connectionRefreshing = true;
+  const refreshOperation = operationId(); const refreshStarted = Date.now();
+  recordEvent('connection_refresh_started', {}, refreshOperation);
+  const refreshStatus = $('connection-refresh-status');
+  refreshStatus.className = 'help'; refreshStatus.textContent = '正在刷新…';
+  connectionReady.hidden = true;
   updateLibraryButtons();
   try {
     await checkCredentials();
     stopRequested = false;
     currentQueryIds = {};
+    queryidDot.className = 'status-dot'; $('queryid-check').hidden = true;
+    connectionReady.hidden = true;
     await discoverQueryIds();
-    showLibrary(hasRequiredQueryIds(currentQueryIds) ? 'X connection refreshed. You can retry the scan; your saved archive is unchanged.' : 'Could not refresh the X connection. Browse your X bookmarks while signed in and retry.');
-  } catch (err) { showLibrary(`Connection refresh failed: ${err.message}`); }
-  finally { libraryBusy = false; updateLibraryButtons(); }
+    const ready = !!currentUserId && [credDot, queryidDot, userDot].every(dot => dot.classList.contains('ok'));
+    if (!ready) { queryidDot.className = 'status-dot error'; queryidText.textContent = '未能获取最新接口信息，请重试刷新。'; }
+    refreshStatus.className = ready ? 'connection-refresh-success' : 'connection-refresh-error';
+    recordEvent('connection_refresh_completed', { result: ready ? 'success' : 'error', duration_ms: Date.now() - refreshStarted }, refreshOperation);
+    refreshStatus.textContent = ready ? '连接已刷新' : '刷新未完成，请确认已登录 X 后重试。';
+    connectionRefreshing = false;
+    renderConnectionChecklist();
+  } catch (err) {
+    connectionReady.hidden = true;
+    recordEvent('connection_refresh_completed', { result: 'error', duration_ms: Date.now() - refreshStarted, error_class: errorClass(err) }, refreshOperation);
+    refreshStatus.className = 'connection-refresh-error';
+    refreshStatus.textContent = `刷新连接失败：${XArchive.errorTextZh(err.message)}`;
+  } finally { connectionRefreshing = false; libraryBusy = false; updateLibraryButtons(); }
 });
 $('btn-import').addEventListener('click', () => { $('library-file').value = ''; $('library-file').click(); });
+$('btn-viewer').addEventListener('click', () => dispatchEvent(new CustomEvent('xkeeps:open-browse', { detail: { source: 'bookmarks' } })));
 $('library-file').addEventListener('change', async () => {
   const file = $('library-file').files[0];
   if (!file || libraryBusy) return;
+  const telemetryId = operationId();
+  recordEvent('archive_import_started', { source: 'bookmarks', format: 'json' }, telemetryId);
   libraryBusy = true;
   updateLibraryButtons();
   try {
     await checkCredentials();
     await loadLibrary();
-    showLibrary(`Reading ${file.name}. Your saved archive is unchanged until you review and save the update.`);
+    showLibrary(`正在读取 ${file.name}。预览并确认保存前，已保存存档不会改变。`);
     const data = JSON.parse(await file.text());
     XArchive.validate(data);
-    if (!currentUserId || XArchive.accountId(data) !== currentUserId) throw new Error('Import a JSON file for the signed-in X account. Other or unidentified accounts can be opened separately in the viewer.');
+    if (!currentUserId || XArchive.accountId(data) !== currentUserId) throw new Error('请选择当前登录X账号的JSON文件。其他账号或未记录账号的文件可在查看器中单独打开。');
     const result = XArchive.merge(libraryRecord?.data, data);
-    if (!result.changed) { showLibrary('This file adds no changes. Your archive and undo copy are unchanged.'); return; }
-    pendingLibraryImport = { ...result, userId: currentUserId, revision: libraryRecord?.revision || 0 };
-    $('library-review-title').textContent = 'Review archive import';
-    $('library-review-expectation').textContent = 'Save adds and refreshes bookmarks for this account. Older saved content stays. Undo restores your previous archive.';
-    $('library-save').textContent = 'Save update';
-    $('library-review-summary').textContent = `${file.name} · Account ${currentUserId}. ${XArchive.summaryText(result.summary)}.`;
-    $('library-review-coverage').textContent = XArchive.describeCoverage(data);
+    if (!result.changed) { recordEvent('archive_import_completed', { source: 'bookmarks', format: 'json', result: 'skipped', item_count: data.bookmarks.length }, telemetryId);
+      showLibrary('内容没有变化。'); return; }
+    pendingLibraryImport = { ...result, userId: currentUserId, revision: libraryRecord?.revision || 0, telemetryId };
+    $('library-review-title').textContent = '确认更新';
+    $('library-review-expectation').textContent = '保存后会补充和刷新此账号的书签；较早内容仍会保留，可撤销本次更新。';
+    $('library-save').textContent = '保存更新';
+    $('library-review-summary').textContent = `${file.name} · 账号 ${currentUserId}。${archiveSummary(result.summary)}。`;
+    $('library-review-coverage').textContent = coverageSummary(data);
     $('library-review-error').textContent = '';
     $('library-review').showModal();
-  } catch (err) { showLibrary(`Could not import: ${err.message} Your saved archive is unchanged.`); }
+  } catch (err) { recordEvent('archive_import_completed', { source: 'bookmarks', format: 'json', result: 'error', error_class: errorClass(err) }, telemetryId);
+    showLibrary(`无法导入：${XArchive.errorTextZh(err.message)}。已保存存档保持不变。`); }
   finally { libraryBusy = false; updateLibraryButtons(); }
 });
-$('library-cancel').addEventListener('click', () => { pendingLibraryImport = null; $('library-review').close(); showLibrary('Update canceled. Your saved archive is unchanged.'); });
-$('library-review').addEventListener('cancel', e => { if (libraryBusy) e.preventDefault(); else { pendingLibraryImport = null; showLibrary('Update canceled. Your saved archive is unchanged.'); } });
+$('library-cancel').addEventListener('click', () => { if (pendingLibraryImport?.telemetryId) recordEvent('archive_import_completed', { source: 'bookmarks', format: 'json', result: 'cancelled' }, pendingLibraryImport.telemetryId);
+  pendingLibraryImport = null; $('library-review').close(); showLibrary('已取消，存档未改变。'); });
+$('library-review').addEventListener('cancel', e => { if (libraryBusy) e.preventDefault(); else { if (pendingLibraryImport?.telemetryId) recordEvent('archive_import_completed', { source: 'bookmarks', format: 'json', result: 'cancelled' }, pendingLibraryImport.telemetryId);
+  pendingLibraryImport = null; showLibrary('已取消，存档未改变。'); } });
 $('library-save').addEventListener('click', async () => {
   if (libraryBusy || !pendingLibraryImport) return;
   libraryBusy = true;
@@ -681,30 +1011,39 @@ $('library-save').addEventListener('click', async () => {
   const pending = pendingLibraryImport;
   try {
     const { userId } = await getCredentials();
-    if (userId !== pending.userId) throw new Error('The signed-in account changed. Cancel and reopen this import for the correct account.');
+    if (userId !== pending.userId) throw new Error('登录账号已切换。请取消并为当前账号重新导入文件。');
     libraryRecord = pending.undo
       ? await archiveStore.undo(`user:${pending.userId}`, pending.revision)
       : await archiveStore.save(`user:${pending.userId}`, pending.data, pending.revision);
+    if (pending.telemetryId) recordEvent('archive_import_completed', { source: 'bookmarks', format: 'json', result: 'success',
+      item_count: pending.data.bookmarks.length }, pending.telemetryId);
     pendingLibraryImport = null;
     $('library-review').close();
-    showLibrary(pending.undo ? 'Previous archive restored. Download the combined JSON to back up this version.' : `Archive saved. ${XArchive.summaryText(pending.summary)}. Download the combined JSON for your viewer and backup.`);
-  } catch (err) { $('library-review-error').textContent = `Could not save: ${err.message} Your previous saved archive is unchanged.`; }
+    showLibrary(pending.undo ? '已恢复上一个存档版本。建议导出一份JSON备份。' : `存档已保存。${archiveSummary(pending.summary)}。`);
+  } catch (err) { $('library-review-error').textContent = `保存失败：${XArchive.errorTextZh(err.message)}。此前的存档保持不变。`; }
   finally { libraryBusy = false; $('library-save').disabled = $('library-cancel').disabled = false; updateLibraryButtons(); }
 });
-$('btn-combined').addEventListener('click', async () => {
-  if (!libraryRecord) return;
-  try { await downloadJSON(libraryRecord.data, libraryRecord.data.export_metadata.screen_name || currentUserId); showLibrary('Combined archive download requested. Check your browser downloads for completion.'); }
-  catch (err) { showLibrary(`Download did not start: ${err.message}. Your saved archive is unchanged.`); }
+$('btn-export').addEventListener('click', handleSelectedExport);
+window.addEventListener('xkeeps:download-format', async event => {
+  if (event.detail.source !== 'bookmarks') return;
+  $('export-format').value = event.detail.format;
+  event.detail.resolve(await handleSelectedExport(event.detail));
+});
+window.addEventListener('xkeeps:local-archive-cleared', event => {
+  if (event.detail.source !== 'bookmarks' || event.detail.userId !== currentUserId) return;
+  libraryRecord = null; runInfo = null; stagedSnapshotAvailable = false;
+  setUIState('idle');
+  loadLibrary().catch(error => { $('library-status').hidden = false; $('library-status').textContent = `读取失败：${XArchive.errorTextZh(error.message)}`; });
 });
 $('btn-undo').addEventListener('click', async () => {
   if (!libraryRecord?.previous || libraryBusy) return;
   pendingLibraryImport = { undo: true, userId: currentUserId, revision: libraryRecord.revision };
-  $('library-review-title').textContent = 'Restore previous archive';
-  $('library-review-summary').textContent = `Account ${currentUserId}. Restore ${libraryRecord.previous.bookmarks.length.toLocaleString()} bookmarks from before the last update. Current archive: ${libraryRecord.data.bookmarks.length.toLocaleString()}.`;
-  $('library-review-coverage').textContent = 'This restores saved content and folder assignments to their previous state.';
-  $('library-review-expectation').textContent = 'Downloaded JSON files are unaffected. Undo is available once. Cancel keeps the current archive.';
+  $('library-review-title').textContent = '撤销并恢复上个存档';
+  $('library-review-summary').textContent = `账号 ${currentUserId}。恢复到上次更新前的 ${libraryRecord.previous.bookmarks.length.toLocaleString()} 条书签；当前存档共 ${libraryRecord.data.bookmarks.length.toLocaleString()} 条。`;
+  $('library-review-coverage').textContent = '此操作会恢复之前保存的书签和文件夹归属。';
+  $('library-review-expectation').textContent = '恢复到上次更新前的内容。\n此次撤销只能使用一次。\n已下载文件不受影响。';
   $('library-review-error').textContent = '';
-  $('library-save').textContent = 'Restore previous archive';
+  $('library-save').textContent = '确认恢复';
   $('library-review').showModal();
   updateLibraryButtons();
 });
@@ -713,22 +1052,25 @@ $('btn-recover').addEventListener('click', async () => {
   libraryBusy = true;
   updateLibraryButtons();
   try { await navigator.locks.request('xarchive-export', { ifAvailable: true }, async lock => {
-    if (!lock) { log('Another tab is collecting data. Wait for it to finish before merging this snapshot.', 'warn'); return; }
+    if (!lock) { log('另一个页面正在采集，请等待结束后再合并快照。', 'warn'); return; }
     try {
       await checkCredentials();
       await loadLibrary();
       runInfo = await getExportState('run_info');
       await mergeCollectedSnapshot();
-    } catch (err) { showLibrary(`Could not merge snapshot: ${err.message}`); }
-  }); } catch (err) { showLibrary(`Could not recover: ${err.message}`); }
+      await saveExportState('run_info', { ...runInfo, archive_merged: true });
+      runInfo.archive_merged = true;
+      await showResult(runInfo.collection.bookmarks === 'complete' ? 'complete' : 'stopped');
+    } catch (err) { showLibrary(`无法合并快照：${XArchive.errorTextZh(err.message)}`); }
+  }); } catch (err) { showLibrary(`无法恢复：${XArchive.errorTextZh(err.message)}`); }
   finally { libraryBusy = false; updateLibraryButtons(); }
 });
 
-btnStart.addEventListener('click', () => runExport().catch(err => { log(err.message, 'error'); setUIState('idle'); }));
+btnStart.addEventListener('click', () => runExport().catch(err => { log(XArchive.errorTextZh(err.message), 'error'); setUIState('idle'); }));
 
 btnPause.addEventListener('click', () => {
   setUIState('paused');
-  log('Pause requested. An in-flight page may finish; no further requests will start until Resume.', 'warn');
+  log('已请求暂停；当前正在处理的页面可能完成，之后会停止新请求，直到您继续。', 'warn');
   let resolve;
   const promise = new Promise((r) => { resolve = r; });
   pauseGate = { promise, resolve };
@@ -740,7 +1082,7 @@ btnResume.addEventListener('click', () => {
     pauseGate = null;
   }
   setUIState('exporting');
-  log('Export resumed.', 'info');
+  log('采集已继续。', 'info');
 });
 
 btnStop.addEventListener('click', () => {
@@ -749,10 +1091,9 @@ btnStop.addEventListener('click', () => {
     pauseGate.resolve();
     pauseGate = null;
   }
-  log('Stop requested... finishing current page.', 'warn');
+  log('已请求停止；当前页面处理结束后将保存部分结果。', 'warn');
 });
 
-btnDownload.addEventListener('click', () => handleDownload().catch(err => log(`Could not download snapshot: ${err.message}`, 'error')));
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -760,7 +1101,8 @@ btnDownload.addEventListener('click', () => handleDownload().catch(err => log(`C
 
 async function init() {
   versionInfo.textContent = `v${VERSION}`;
-  log('xarchive initialized.', 'info');
+  log('Xkeeps 已启动。', 'info');
+  setUIState('idle');
   await checkCredentials();
   showLibrary();
   await checkPriorExport();
@@ -772,9 +1114,14 @@ async function init() {
       try {
         await checkCredentials();
         if (previousUser !== currentUserId) { await loadLibrary(); await checkPriorExport(); }
-      } catch (err) { log(`Could not refresh account status: ${err.message}`, 'error'); }
+      } catch (err) { log(`无法刷新账号状态：${XArchive.errorTextZh(err.message)}`, 'error'); }
     }
   }, 10_000);
 }
 
-init().catch(err => { $('library-status').textContent = `Could not initialize: ${err.message}`; log(err.message, 'error'); });
+init().catch(err => { $('library-status').textContent = `初始化失败：${XArchive.errorTextZh(err.message)}`; log(`初始化失败：${XArchive.errorTextZh(err.message)}`, 'error'); });
+chrome.runtime.onMessage?.addListener(message => {
+  if (message?.type === 'xkeeps:archive-updated' && message.source === 'bookmarks' && message.userId === currentUserId) {
+    loadLibrary().catch(err => log(`无法读取定时更新后的存档：${XArchive.errorTextZh(err.message)}`, 'error'));
+  }
+});

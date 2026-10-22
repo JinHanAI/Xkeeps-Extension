@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/project-initiation-manifest.schema.json",
+  "title": "Project initiation gate evidence",
+  "type": "object",
+  "required": ["schema_version", "gate", "project"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "gate": {"$ref": "#/$defs/gate"},
+    "project": {"$ref": "#/$defs/project"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "gate": {
+          "properties": {
+            "mode": {"const": "formal"},
+            "status": {"const": "passed"}
+          }
+        },
+        "survey": {"$ref": "#/$defs/survey"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "independent_review": {"$ref": "#/$defs/review"},
+        "artifacts": {"$ref": "#/$defs/artifacts"}
+      },
+      "required": ["survey", "decision", "independent_review", "artifacts"]
+    },
+    {
+      "properties": {
+        "gate": {
+          "properties": {
+            "mode": {"const": "incubation"},
+            "status": {"const": "waived"}
+          }
+        },
+        "waiver": {"$ref": "#/$defs/waiver"}
+      },
+      "required": ["waiver"]
+    }
+  ],
+  "$defs": {
+    "nonempty": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+    "gate": {
+      "type": "object",
+      "required": ["mode", "status", "generated_at", "valid_until"],
+      "properties": {
+        "mode": {"enum": ["formal", "incubation"]},
+        "status": {"enum": ["passed", "waived"]},
+        "generated_at": {"$ref": "#/$defs/timestamp"},
+        "valid_until": {"$ref": "#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "slug", "problem", "target_users", "why_now", "scope", "implementation_owner"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonempty"},
+        "slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "problem": {"$ref": "#/$defs/nonempty"},
+        "target_users": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonempty"}},
+        "why_now": {"$ref": "#/$defs/nonempty"},
+        "scope": {"enum": ["new_project", "new_product", "new_repository", "major_direction"]},
+        "implementation_owner": {"$ref": "#/$defs/nonempty"}
+      },
+      "additionalProperties": false
+    },
+    "query": {
+      "type": "object",
+      "required": ["provider", "query", "result_url", "searched_at"],
+      "properties": {
+        "provider": {"enum": ["github", "web", "official_docs", "package_registry", "community", "app_store", "other"]},
+        "query": {"$ref": "#/$defs/nonempty"},
+        "result_url": {"$ref": "#/$defs/url"},
+        "searched_at": {"$ref": "#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["url", "observed_at", "claim"],
+      "properties": {
+        "url": {"$ref": "#/$defs/url"},
+        "observed_at": {"$ref": "#/$defs/timestamp"},
+        "claim": {"$ref": "#/$defs/nonempty"}
+      },
+      "additionalProperties": false
+    },
+    "claim": {
+      "type": "object",
+      "required": ["claim", "evidence_urls"],
+      "properties": {
+        "claim": {"$ref": "#/$defs/nonempty"},
+        "evidence_urls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/url"}}
+      },
+      "additionalProperties": false
+    },
+    "gap": {
+      "type": "object",
+      "required": ["claim", "evidence_urls", "basis", "confidence"],
+      "properties": {
+        "claim": {"$ref": "#/$defs/nonempty"},
+        "evidence_urls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/url"}},
+        "basis": {"enum": ["source", "user_feedback", "code_inspection", "inference"]},
+        "confidence": {"enum": ["high", "medium", "low"]}
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["name", "url", "category", "maintenance", "adoption", "license", "security", "strengths", "gaps", "fit"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonempty"},
+        "url": {"$ref": "#/$defs/url"},
+        "source_commit": {"type": "string", "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"},
+        "source_commit_url": {"$ref": "#/$defs/url"},
+        "github_snapshot_path": {"type": "string", "minLength": 1},
+        "github_snapshot_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "category": {"enum": ["direct", "adjacent", "component", "workflow_alternative"]},
+        "maintenance": {
+          "type": "object",
+          "required": ["status", "evidence"],
+          "properties": {
+            "status": {"enum": ["active", "slow", "inactive", "archived", "unknown"]},
+            "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}}
+          }
+        },
+        "adoption": {
+          "type": "object",
+          "required": ["status", "evidence"],
+          "properties": {
+            "status": {"enum": ["high", "medium", "low", "unknown"]},
+            "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}}
+          }
+        },
+        "license": {
+          "type": "object",
+          "required": ["spdx", "evidence_url"],
+          "properties": {
+            "spdx": {"$ref": "#/$defs/nonempty"},
+            "evidence_url": {"$ref": "#/$defs/url"}
+          }
+        },
+        "security": {
+          "type": "object",
+          "required": ["status", "notes", "evidence"],
+          "properties": {
+            "status": {"enum": ["acceptable", "needs_review", "unacceptable", "unknown"]},
+            "notes": {"$ref": "#/$defs/nonempty"},
+            "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}}
+          }
+        },
+        "strengths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/claim"}},
+        "gaps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/gap"}},
+        "fit": {"enum": ["adopt", "integrate", "fork", "reference", "reject"]}
+      },
+      "additionalProperties": false
+    },
+    "survey": {
+      "type": "object",
+      "required": ["skill", "survey_run_id", "completed_at", "github_search_snapshot_path", "github_search_snapshot_sha256", "queries", "no_candidates_found", "no_candidates_reason", "candidates"],
+      "properties": {
+        "skill": {"const": "survey"},
+        "survey_run_id": {"$ref": "#/$defs/nonempty"},
+        "completed_at": {"$ref": "#/$defs/timestamp"},
+        "github_search_snapshot_path": {"type": "string", "minLength": 1},
+        "github_search_snapshot_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "queries": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/query"}},
+        "no_candidates_found": {"type": "boolean"},
+        "no_candidates_reason": {"type": "string"},
+        "candidates": {"type": "array", "items": {"$ref": "#/$defs/candidate"}}
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["outcome", "rationale", "why_existing_not_sufficient", "minimum_differentiation", "upstream_sources", "next_step"],
+      "properties": {
+        "outcome": {"enum": ["adopt", "integrate", "fork", "build", "no_build"]},
+        "rationale": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonempty"}},
+        "why_existing_not_sufficient": {"type": "array", "items": {"$ref": "#/$defs/nonempty"}},
+        "minimum_differentiation": {"type": "array", "items": {"$ref": "#/$defs/nonempty"}},
+        "upstream_sources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["repository_url", "base_commit"],
+            "properties": {
+              "repository_url": {"$ref": "#/$defs/url"},
+              "base_commit": {"type": "string", "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "next_step": {"$ref": "#/$defs/nonempty"}
+      },
+      "additionalProperties": false
+    },
+    "review_check": {
+      "type": "object",
+      "required": ["id", "result", "evidence"],
+      "properties": {
+        "id": {"enum": ["coverage", "maintenance", "adoption", "license_security", "confirmation_bias", "evidence_integrity"]},
+        "result": {"const": "pass"},
+        "evidence": {"$ref": "#/$defs/nonempty"}
+      },
+      "additionalProperties": false
+    },
+    "challenge": {
+      "type": "object",
+      "required": ["challenge", "resolution", "evidence_urls"],
+      "properties": {
+        "challenge": {"$ref": "#/$defs/nonempty"},
+        "resolution": {"$ref": "#/$defs/nonempty"},
+        "evidence_urls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/url"}}
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "required": ["review_run_id", "reviewer", "reviewer_role", "reviewed_at", "reviewed_report_sha256", "verdict", "checks", "challenges"],
+      "properties": {
+        "review_run_id": {"$ref": "#/$defs/nonempty"},
+        "reviewer": {"$ref": "#/$defs/nonempty"},
+        "reviewer_role": {"const": "independent_reviewer"},
+        "reviewed_at": {"$ref": "#/$defs/timestamp"},
+        "reviewed_report_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "verdict": {"const": "pass"},
+        "checks": {"type": "array", "minItems": 6, "items": {"$ref": "#/$defs/review_check"}},
+        "challenges": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/challenge"}}
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["report_path", "report_sha256"],
+      "properties": {
+        "report_path": {"type": "string", "minLength": 1},
+        "report_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "waiver": {
+      "type": "object",
+      "required": ["approved_by", "approval_reference", "approved_at", "reason", "risks", "allowed_actions", "prohibited_actions", "review_at"],
+      "properties": {
+        "approved_by": {"$ref": "#/$defs/nonempty"},
+        "approval_reference": {"$ref": "#/$defs/nonempty"},
+        "approved_at": {"$ref": "#/$defs/timestamp"},
+        "reason": {"$ref": "#/$defs/nonempty"},
+        "risks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonempty"}},
+        "allowed_actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["local_notes", "local_mockup", "read_only_research", "throwaway_local_prototype"]}
+        },
+        "prohibited_actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["formal_project_directory", "git_init", "git_remote", "push", "pull_request", "deployment", "payment_activity", "production_data"]
+          }
+        },
+        "review_at": {"$ref": "#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

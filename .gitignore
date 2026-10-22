@@ -1,36 +1,10 @@
-# Dependencies
-node_modules/
-
-# Build output
 dist/
-build/
-*.crx
-*.pem
-*.zip
-
-# IDE / Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
+node_modules/
 .DS_Store
-Thumbs.db
-Desktop.ini
-
-# Environment / secrets
 .env
-.env.local
+.env.*
+*.pem
 *.key
-
-# Logs
-*.log
-npm-debug.log*
-
-# Chrome extension development
-key.pem
-
-# Personal exports belong outside source control. Tests use named synthetic fixtures.
 xarchive_*.json
+Xkeeps_*.json
+Xkeeps_Likes_*.json

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-09-29T16:35:59.241461+00:00",
+  "repository_url": "https://github.com/prinsss/twitter-web-exporter",
+  "api_url": "https://api.github.com/repos/prinsss/twitter-web-exporter",
+  "repository": {
+    "full_name": "prinsss/twitter-web-exporter",
+    "html_url": "https://github.com/prinsss/twitter-web-exporter",
+    "archived": false,
+    "disabled": false,
+    "fork": false,
+    "default_branch": "main",
+    "pushed_at": "2026-08-31T04:21:34Z",
+    "updated_at": "2026-09-29T14:16:57Z",
+    "stargazers_count": 2725,
+    "forks_count": 206,
+    "open_issues_count": 25,
+    "license_spdx": "MIT"
+  },
+  "default_branch_commit": {
+    "sha": "ddf2b0c823680b904daae166f3eb05b81950ce7e",
+    "html_url": "https://github.com/prinsss/twitter-web-exporter/commit/ddf2b0c823680b904daae166f3eb05b81950ce7e",
+    "committed_at": "2026-08-31T04:20:07Z"
+  },
+  "latest_release": {
+    "tag_name": "v1.4.3",
+    "published_at": "2026-08-31T04:23:02Z",
+    "html_url": "https://github.com/prinsss/twitter-web-exporter/releases/tag/v1.4.3"
+  }
+}

@@ -3,18 +3,11 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const viewerHtml = readFileSync(new URL('../viewer.html', import.meta.url), 'utf8');
-const inlineScript = viewerHtml.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-
-if (!inlineScript) {
-  throw new Error('Could not find the viewer inline script');
-}
-
 // Initialization needs a browser. The index-building code can run in a small
 // VM context, which keeps this regression test dependency-free.
-const viewerCode = inlineScript.replace(/\/\/ ---- Start ----[\s\S]*$/, '');
+const viewerCode = readFileSync(new URL('../viewer.js', import.meta.url), 'utf8').replace(/\/\/ ---- Start ----[\s\S]*$/, '');
 
-function createViewerContext() {
+function createViewerContext({ extensionId = null } = {}) {
   const element = {
     addEventListener() {},
     classList: { add() {}, remove() {}, toggle() {} },
@@ -31,16 +24,22 @@ function createViewerContext() {
       createElement() { return { style: {}, dataset: {}, querySelector() { return null; }, querySelectorAll() { return []; } }; },
     },
     navigator: { userAgent: 'node-test' },
+    chrome: extensionId ? { runtime: { id: extensionId } } : undefined,
     setTimeout() { return 0; },
     URL,
     window: { location: { href: 'file:///viewer.html', protocol: 'file:' } },
   });
 
   vm.runInContext(readFileSync(new URL('../lib/archive.js', import.meta.url), 'utf8'), context);
+  vm.runInContext(readFileSync(new URL('../lib/search-index.js', import.meta.url), 'utf8'), context);
+  const storeNames = [];
+  context.storeNames = storeNames;
+  context.XArchive.ArchiveStore = class { constructor(name) { storeNames.push(name); } };
   vm.runInContext(viewerCode, context);
   vm.runInContext(`
     sleep = async () => {};
     renderFolders = () => {};
+    renderTags = () => {};
     applyFilters = () => {};
   `, context);
   return context;
@@ -88,6 +87,11 @@ test('viewer indexes names that collide with Object prototype properties', async
     protoSearch: [0],
     ordinarySearch: [0],
   });
+});
+
+test('extension viewer uses a separate archive database from the collection page', () => {
+  const context = createViewerContext({ extensionId: 'synthetic-extension-id' });
+  assert.deepEqual(Array.from(context.storeNames), ['xarchive-viewer-library']);
 });
 
 test('viewer handles a colliding token late in a 30,000-bookmark export', async () => {
@@ -149,6 +153,22 @@ test('untrusted URLs and display text cannot inject attributes or executable lin
   assert.match(html, /%22%20onclick%3D%22/);
   assert.equal(vm.runInContext("safeUrl('file:///private.txt')", context), '');
   assert.equal(vm.runInContext("safeUrl('data:text/html,test')", context), '');
+});
+
+test('viewer retains Chinese text, author identity, emoji and safe avatar URLs', () => {
+  const context = createViewerContext();
+  context.input = {
+    tweet_id: '88', full_text: '中文正文 ✨ long-form ✅', in_reply_to_tweet_id: '77',
+    entities: { mentions: [{ screen_name: 'helper' }] },
+    author: { name: '作者✨', screen_name: 'writer', user_id: '123', profile_image_url: 'https://pbs.twimg.com/avatar.jpg' },
+  };
+  const html = vm.runInContext('createTweetElement(input, 0, 0).innerHTML', context);
+  assert.match(html, /作者✨/);
+  assert.match(html, /@writer/);
+  assert.match(html, /https:\/\/pbs\.twimg\.com\/avatar\.jpg/);
+  assert.match(html, /中文正文 ✨ long-form ✅/);
+  assert.match(html, /回复给 <a/);
+  assert.doesNotMatch(html, /Replying to/);
 });
 
 test('linkification does not rewrite URL fragments or escaped HTML entities', () => {

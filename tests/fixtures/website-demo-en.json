@@ -1,0 +1,89 @@
+{
+  "export_metadata": {
+    "user_id": "42",
+    "screen_name": "xkeeps_demo",
+    "exported_at": "2026-10-12T08:00:00Z"
+  },
+  "bookmarks": [
+    {
+      "tweet_id": "9900001001",
+      "status": "available",
+      "created_at": "2026-10-11T08:30:00Z",
+      "full_text": "AI research worth keeping.\n\nBefore using a new tool, save the source, check its limits, and test one real workflow.",
+      "author": {
+        "name": "Mira Chen",
+        "screen_name": "mira_notes",
+        "profile_image_url": null
+      },
+      "media": [
+        {
+          "type": "photo",
+          "url": "https://pbs.twimg.com/xkeeps-synthetic-public-photo-1.png"
+        }
+      ],
+      "folders": [
+        "f1"
+      ]
+    },
+    {
+      "tweet_id": "9900001002",
+      "status": "available",
+      "created_at": "2026-10-10T08:30:00Z",
+      "full_text": "A useful product starts with one task.\n\nMake that task easy to finish. Keep the interface clear.",
+      "author": {
+        "name": "Alex Park",
+        "screen_name": "alex_builds",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": [
+        "f1"
+      ]
+    },
+    {
+      "tweet_id": "9900001003",
+      "status": "available",
+      "created_at": "2026-10-09T08:30:00Z",
+      "full_text": "My reading list for the weekend.\n\nA few good ideas become more useful when I can find them again.",
+      "author": {
+        "name": "Lena Gray",
+        "screen_name": "lena_reads",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    },
+    {
+      "tweet_id": "9900001004",
+      "status": "available",
+      "created_at": "2026-10-08T08:30:00Z",
+      "full_text": "AI workflow notes.\n\nCollect the examples, compare the outputs, and keep the evidence with the idea.",
+      "author": {
+        "name": "Mira Chen",
+        "screen_name": "mira_notes",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    },
+    {
+      "tweet_id": "9900001005",
+      "status": "available",
+      "created_at": "2026-10-07T08:30:00Z",
+      "full_text": "Design references for a calmer screen.\n\nLess noise, more space, and a clear next step.",
+      "author": {
+        "name": "Studio Field",
+        "screen_name": "studio_field",
+        "profile_image_url": null
+      },
+      "media": [],
+      "folders": []
+    }
+  ],
+  "folders": [
+    {
+      "id": "f1",
+      "name": "Research"
+    }
+  ]
+}

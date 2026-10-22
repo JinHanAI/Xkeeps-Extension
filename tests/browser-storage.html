@@ -71,6 +71,12 @@
     await store.undo('user:42', 4);
     assert((await store.get('active')).value === 'user:42', 'undo left another account selected');
   });
+  await test('Deleting one local account clears its active pointer but keeps the other account', async () => {
+    await store.remove('user:42');
+    assert((await store.get('user:42')) === null, 'target archive remains');
+    assert((await store.get('active')) === null, 'active account still points to deleted data');
+    assert((await store.get('user:43'))?.data.export_metadata.user_id === '43', 'other account was changed');
+  });
   indexedDB.deleteDatabase(name);
   document.getElementById('status').textContent = failures ? `${failures} tests failed` : `All ${tests} storage tests passed`;
 })();

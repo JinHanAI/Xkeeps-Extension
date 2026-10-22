@@ -1,0 +1,12 @@
+{
+  "format": "xkeeps-likes",
+  "schema_version": 1,
+  "source": "likes",
+  "kind": "snapshot",
+  "account": { "user_id": "42", "screen_name": "archive_demo" },
+  "collection": { "mode": "sample", "coverage": "partial", "reason": "sample_limit" },
+  "exported_at": "2026-09-29T00:00:00.000Z",
+  "likes": [
+    { "tweet_id": "201", "status": "available", "created_at": "2026-09-01T00:00:00Z", "full_text": "一条示例点赞 ✨", "liked_at": null, "first_seen_at": "2026-09-29T00:00:00.000Z", "last_seen_at": "2026-09-29T00:00:00.000Z", "author": { "name": "示例作者 ✨", "screen_name": "archive_author", "user_id": "12", "profile_image_url": "http://127.0.0.1:8742/icons/icon48.png" }, "media": [{ "type": "photo", "url": "http://127.0.0.1:8742/icons/icon48.png" }] }
+  ]
+}

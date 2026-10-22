@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "Xkeeps"
+  },
+  "appDescription": {
+    "message": "保存你的 X 收藏和点赞，支持搜索和下载"
+  },
+  "actionTitle": {
+    "message": "打开Xkeeps"
+  }
+}

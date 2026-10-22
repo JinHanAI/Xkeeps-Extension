@@ -2,9 +2,49 @@
 <p>Loading the extension UI with synthetic X responses. No requests go to X.</p>
 <script>
 (async () => {
-  const html = await (await fetch('../options.html')).text();
+  const fixtureOptions = new URL(location.href).searchParams;
+  const fixtureLanguage = fixtureOptions.get('lang') || (fixtureOptions.get('scenario') === 'website-demo' ? 'en' : 'zh-CN');
+  const resetKey = 'qa-support-reset:' + fixtureOptions.get('scenario') + ':' + fixtureOptions.get('account');
+  if (fixtureOptions.get('scenario')?.startsWith('support-') && fixtureOptions.get('reset') !== '0' && !sessionStorage.getItem(resetKey)) {
+    await new Promise((resolve, reject) => { const req = indexedDB.deleteDatabase('xkeeps-preferences-v1'); req.onsuccess = resolve; req.onerror = () => reject(req.error); });
+    sessionStorage.setItem(resetKey, 'done');
+  }
+  if (fixtureOptions.get('scenario')?.startsWith('support-directory') || ['website-demo', 'playback', 'playback-failure', 'support-empty', 'support-preview-retry', 'support-ui', 'support-final-failure', 'support-partial-media', 'support-save-cancel', 'support-avatar-speed', 'support-browse', 'support-browse-partial', 'support-likes'].includes(fixtureOptions.get('scenario'))) {
+    const data = await (await fetch(fixtureOptions.get('scenario') === 'website-demo' ? (fixtureLanguage.startsWith('zh') ? 'fixtures/website-demo.json' : 'fixtures/website-demo-en.json') : 'fixtures/preview-archive.json', { cache: 'no-store' })).json();
+    const account = fixtureOptions.get('account') || '42';
+    data.export_metadata.user_id = account;
+    if (fixtureOptions.get('scenario') === 'support-empty') data.bookmarks = [];
+    if (fixtureOptions.get('scenario') === 'support-avatar-speed') {
+      const post=data.bookmarks[0];
+      data.bookmarks=Array.from({length:160},(_,i)=>({...structuredClone(post),tweet_id:String(8000+i),author:{...post.author,name:`示例作者 ${i}`,screen_name:`demo_${i}`,profile_image_url:`https://pbs.twimg.com/xkeeps-synthetic-avatar-${i}.png`}}));
+    }
+    if (fixtureOptions.get('scenario')?.startsWith('support-directory')) {
+      data.bookmarks = Array.from({length:3}, (_,i) => ({tweet_id:String(9100+i),status:'available',created_at:'2026-10-03T18:13:47Z',full_text:`目录测试 ${i} ✨`,author:{name:'示例作者',screen_name:'example_author',profile_image_url:'https://pbs.twimg.com/xkeeps-synthetic.png'},media:[{type:'photo',url:`https://pbs.twimg.com/xkeeps-synthetic-directory-${i}.png`},...(i===0?[{type:'video',duration_ms:1000,variants:[{content_type:'video/mp4',url:'https://video.twimg.com/xkeeps-synthetic.mp4',bitrate:800000}]}]:[])]}));
+    }
+    const db = await new Promise((resolve, reject) => { const req = indexedDB.open('xarchive-library', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('archives', { keyPath:'key' });
+      req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+    await new Promise((resolve, reject) => { const tx = db.transaction('archives', 'readwrite');
+      tx.objectStore('archives').put({ key:`user:${account}`,data,revision:1 }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+    db.close();
+    if (fixtureOptions.get('scenario') === 'support-likes') {
+      const likes={format:'xkeeps-likes',schema_version:1,source:'likes',kind:'cumulative',account:{user_id:account,screen_name:'archive_demo'},collection:{mode:'sample',coverage:'partial',reason:'sample_limit'},exported_at:data.export_metadata.exported_at,likes:data.bookmarks.map(post=>({...post,full_text:post.full_text+' 中文✨✅',author:{...post.author,name:'示例作者✨'}}))};
+      const db = await new Promise((resolve,reject) => { const req=indexedDB.open('xkeeps-likes-library',1); req.onupgradeneeded=()=>req.result.createObjectStore('accounts',{keyPath:'user_id'}); req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error); });
+      await new Promise((resolve,reject) => { const tx=db.transaction('accounts','readwrite'); tx.objectStore('accounts').put({user_id:account,current:likes,snapshot:likes,revision:1}); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); }); db.close();
+    }
+  }
+  const html = await (await fetch('../options.html', { cache: 'no-store' })).text();
+  const fixtureScript = `tests/extension-fixture.js?v=website-original-posts-20261012&scenario=${encodeURIComponent(fixtureOptions.get('scenario') || 'full')}&lang=${encodeURIComponent(fixtureLanguage)}&account=${encodeURIComponent(fixtureOptions.get('account') || '42')}&fail=${encodeURIComponent(fixtureOptions.get('fail') || '')}`;
   document.open();
-  document.write(html.replace('<head>', '<head><base href="/"><script src="tests/extension-fixture.js"><' + '/script>'));
+  const fresh = html.replace(/((?:src|href)="[^"#?]+\.(?:js|css))(?:\?[^\"]*)?(?=")/g, `$1?v=${Date.now()}`);
+  const imports = Object.fromEntries(['avatar-prefetch', 'media-save', 'export-outcome', 'support-config', 'support-preferences', 'support-ui', 'analytics', 'api', 'archive', 'browse-archive', 'db', 'downloads', 'export-formats', 'exporter', 'fetcher', 'folders', 'i18n', 'identity', 'likes-archive', 'likes-fetcher', 'media-backup', 'media-package', 'offline-view', 'parser', 'query-ids', 'scheduled-sync', 'search-index', 'time-range', 'update-status', 'utils', 'viewer-workflow'].map(name => [`/lib/${name}.js`, `/lib/${name}.js?v=${Date.now()}`]));
+  if (fixtureOptions.get('scenario')?.startsWith('support-')) imports['/lib/support-config.js'] = '/tests/support-fixture-config.js';
+  if (fixtureOptions.get('scenario')?.startsWith('support-directory')) {
+    imports['/lib/media-save.js'] = '/tests/support-directory-save.js';
+    imports['/lib/media-package.js'] = '/tests/support-directory-package.js';
+  }
+  imports['/version.js'] = `/version.js?v=${Date.now()}`;
+  document.write(fresh.replace('<head>', `<head><base href="/"><script type="importmap">${JSON.stringify({ imports })}<` + `/script><script src="${fixtureScript}"><` + '/script>'));
   document.close();
 })();
 </script></html>

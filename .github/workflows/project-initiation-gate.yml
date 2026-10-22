@@ -1,0 +1,29 @@
+name: Project initiation gate
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: project-initiation / validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate pre-project evidence bundle
+        run: >-
+          python3 .project-governance/initiation/verify_bundle.py
+          verify-bundle
+          --project-root .
+      - name: Verify admission existed at the Git history boundary
+        run: >-
+          python3 .project-governance/initiation/verify_bundle.py
+          verify-history
+          --project-root .
+          --revision HEAD

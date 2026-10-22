@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Xkeeps analytics storage test</title>
+<p id="status" role="status">Running…</p>
+<script type="module">
+import { track, listEvents, clearEvents, recordEvent } from '../lib/analytics.js';
+const status = document.getElementById('status');
+try {
+  await clearEvents();
+  const started = await track('archive_export_started', { source: 'bookmarks', format: 'json', scope: 'cumulative', period: 'all' });
+  await track('archive_export_completed', { source: 'bookmarks', format: 'json', scope: 'cumulative', period: 'all', result: 'success', item_count: 3 }, started.operation_id);
+  const rows = await listEvents();
+  if (rows.length !== 2 || rows[0].operation_id !== rows[1].operation_id) throw new Error('event pair was not stored or linked');
+  if (JSON.stringify(rows).includes('account_user_id') || JSON.stringify(rows).includes('filename')) throw new Error('unexpected private field');
+  const ignored = await recordEvent('archive_export_completed', { source: 'likes', filename: '/private/export.json' });
+  if (ignored !== null || (await listEvents()).length !== 2) throw new Error('private field entered storage');
+  const database = await new Promise((resolve, reject) => {
+    const req = indexedDB.open('xkeeps-analytics-v1', 1);
+    req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+  });
+  await new Promise((resolve, reject) => {
+    const tx = database.transaction('events', 'readwrite');
+    tx.objectStore('events').put({ ...rows[0], event_id: crypto.randomUUID(), occurred_at: '2020-01-01T00:00:00.000Z' });
+    tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+  database.close();
+  await track('page_viewed', { page: 'browse' });
+  if ((await listEvents()).length !== 3) throw new Error('expired event was not pruned');
+  await clearEvents();
+  if ((await listEvents()).length) throw new Error('clear did not remove the events');
+  status.textContent = 'PASS: IndexedDB save, pairing, privacy rejection, 90-day expiry, and clear';
+} catch (error) { status.textContent = `FAIL: ${error.message}`; }
+</script></html>

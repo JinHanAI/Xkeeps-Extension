@@ -1,145 +1,315 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>xarchive - Export X.com Bookmarks</title>
+  <title>Xkeeps - X 收藏与点赞导出</title>
+  <link rel="icon" type="image/png" href="icons/icon32.png">
   <link rel="stylesheet" href="options.css">
+  <link rel="stylesheet" href="shell.css">
 </head>
 <body>
+  <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="icon-source" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16M7 3v4m10 3v4M7 17v4"/></symbol>
+    <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 9a8 8 0 0 1 14-2l1 5M4 12l1 5a8 8 0 0 0 14-2"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
+    <symbol id="icon-export" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></symbol>
+    <symbol id="icon-zip" viewBox="0 0 24 24"><path d="M5 3h14v18H5zM11 3v9m2-7h-2m2 3h-2m2 3h-2m-2 5h6v3H9z"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Zm0 7v5m0 3v.1"/></symbol>
+  </svg>
   <div class="container">
     <header>
-      <h1>xarchive</h1>
-      <p class="subtitle">Keep a growing archive of your X.com bookmarks</p>
+      <div class="header-top"><h1>Xkeeps</h1><label class="language-choice" for="ui-language"><span>语言 / Language</span><select id="ui-language"><option value="zh">中文</option><option value="en">English</option></select></label></div>
+      <p class="subtitle">X 收藏与点赞存档导出 · Export your bookmarks and likes</p>
+      <div class="workflow" aria-label="使用流程"><span><svg><use href="#icon-source"/></svg>选择来源</span><span aria-hidden="true">→</span><span><svg><use href="#icon-export"/></svg>查看存档</span><span aria-hidden="true">→</span><span><svg><use href="#icon-sync"/></svg>下载或更新</span></div>
     </header>
+
+    <section class="card source-card" aria-label="选择内容来源">
+      <div class="source-heading">
+        <label for="content-source">内容来源</label>
+        <p class="help">收藏和点赞分别保存。</p>
+      </div>
+      <select id="content-source"><option value="bookmarks">收藏</option><option value="likes">点赞</option></select>
+    </section>
+
+    <section class="card search-card" aria-labelledby="search-title">
+      <h2 id="search-title"><svg class="section-icon" aria-hidden="true"><use href="#icon-search"/></svg>搜索内容</h2>
+      <p class="help">搜索已保存的正文、作者或链接。</p>
+      <div class="search-controls">
+        <div class="form-field"><label for="local-search">搜索内容</label><input id="local-search" type="search" autocomplete="off" placeholder="输入关键词"></div>
+        <div class="form-field" id="search-folder-field"><label for="search-folder">文件夹</label><select id="search-folder"><option value="">全部文件夹</option></select></div>
+      </div>
+      <p id="search-status" class="help" role="status" aria-live="polite">正在读取存档…</p>
+      <div id="search-results" class="search-results" aria-label="搜索结果"></div>
+    </section>
+
+    <section class="card" id="media-backup-section" aria-labelledby="media-backup-title">
+      <h2 id="media-backup-title"><svg class="section-icon" aria-hidden="true"><use href="#icon-zip"/></svg>下载内容和媒体</h2>
+      <p class="help">勾选要保存的作者头像、文章配图或视频，预计体积会随选择变化。估算不请求 X；下载媒体时需要访问对应链接。</p>
+      <div class="media-breakdown" aria-label="存档体积明细">
+        <div class="media-estimate-card media-fixed"><strong>文本与存档</strong><span id="media-text-detail">正在读取…</span></div>
+        <label class="media-estimate-card"><span class="media-card-title"><input id="media-avatars" type="checkbox" checked><strong>作者头像</strong></span><span id="media-avatar-detail">正在读取…</span></label>
+        <label class="media-estimate-card"><span class="media-card-title"><input id="media-photos" type="checkbox"><strong>文章配图</strong></span><span id="media-photo-detail">正在读取…</span></label>
+        <label class="media-estimate-card"><span class="media-card-title"><input id="media-videos" type="checkbox"><strong>视频动图</strong></span><span id="media-video-detail">正在读取…</span></label>
+      </div>
+      <p class="media-total"><strong>预计大小</strong><span id="media-total-size">正在读取…</span></p>
+      <p id="media-estimate-result" class="help" role="status" aria-live="polite">正在读取存档…</p>
+      <div class="media-actions">
+        <button id="media-estimate" class="secondary" disabled>估算大小</button>
+        <button id="media-download" disabled>下载内容和媒体 ZIP</button>
+        <button id="media-cancel" class="secondary" hidden>取消下载</button>
+      </div>
+      <p id="media-progress" class="help" role="status" aria-live="polite"></p>
+    </section>
 
     <!-- Status Section -->
     <section id="status-section" class="card">
-      <h2>Status</h2>
+      <h2>连接状态</h2>
       <div id="cred-status" class="status-item">
         <span class="status-dot" id="cred-dot"></span>
-        <span id="cred-text">Checking credentials...</span>
+        <span id="cred-text">正在检查 X 连接…</span>
+        <span class="status-check" id="cred-check" aria-hidden="true" hidden>✓</span>
       </div>
       <div id="queryid-status" class="status-item">
         <span class="status-dot" id="queryid-dot"></span>
-        <span id="queryid-text">Checking query IDs...</span>
+        <span id="queryid-text">查询接口准备中…</span>
+        <span class="status-check" id="queryid-check" aria-hidden="true" hidden>✓</span>
       </div>
       <div id="user-status" class="status-item">
         <span class="status-dot" id="user-dot"></span>
-        <span id="user-text">Checking user session...</span>
+        <span id="user-text">正在确认登录账号…</span>
+        <span class="status-check" id="user-check" aria-hidden="true" hidden>✓</span>
       </div>
       <p id="hint-text" class="hint" style="display:none;"></p>
-      <button id="btn-connection" class="secondary" disabled>Refresh X connection</button>
-      <p class="help">If X rejects a request, refresh the connection to capture current request settings. This briefly opens X tabs; your saved archive stays unchanged.</p>
+      <div class="connection-refresh-row">
+        <button id="btn-connection" class="secondary" disabled>重连账号</button>
+        <span id="connection-refresh-status" role="status" aria-live="polite"></span>
+      </div>
+      <p id="bookmark-connection-help" class="help">连接失效时，点击重试。</p>
+      <div id="connection-ready" class="connection-ready" hidden>
+        <div id="connection-confetti" class="connection-confetti" aria-hidden="true"></div>
+        <button id="connection-go-home" type="button">获取内容</button>
+      </div>
+    </section>
+
+    <section class="card" id="schedule-section" aria-labelledby="schedule-title">
+      <h2 id="schedule-title"><svg class="section-icon" aria-hidden="true"><use href="#icon-sync"/></svg>定时更新 <span class="xk-lab-badge">实验功能</span></h2>
+      <p class="help">收藏和点赞可分别开启。
+需保持Chrome开启、电脑唤醒。
+每次只检查第一页，失败后不重试。
+不自动下载头像、图片和视频。
+更新时间可能延迟。</p>
+      <p class="help xk-lab-note">功能可能中断，请留意更新结果。</p>
+      <div class="schedule-grid">
+        <div class="schedule-row" data-source="bookmarks"><h3>收藏</h3><label><input id="schedule-bookmarks-enabled" type="checkbox"> 开启</label><label>更新间隔 <select id="schedule-bookmarks-interval"><option value="daily">1 天</option><option value="weekly">7 天</option><option value="30d">30 天</option><option value="90d">90 天</option><option value="180d">180 天</option></select></label><input id="schedule-bookmarks-pages" value="1" type="hidden"><button id="schedule-bookmarks-save" class="secondary">保存设置</button><p id="schedule-bookmarks-status" class="help" role="status"></p></div>
+        <div class="schedule-row" data-source="likes"><h3>点赞</h3><label><input id="schedule-likes-enabled" type="checkbox"> 开启</label><label>更新间隔 <select id="schedule-likes-interval"><option value="daily">1 天</option><option value="weekly">7 天</option><option value="30d">30 天</option><option value="90d">90 天</option><option value="180d">180 天</option></select></label><input id="schedule-likes-pages" value="1" type="hidden"><button id="schedule-likes-save" class="secondary">保存设置</button><p id="schedule-likes-status" class="help" role="status"></p></div>
+      </div>
     </section>
 
     <!-- Controls Section -->
     <section id="library-section" class="card">
-      <h2>Your saved archive</h2>
-      <p id="library-status" role="status" aria-live="polite">Loading saved archive…</p>
+      <p id="library-status" role="status" aria-live="polite">正在读取存档…</p>
       <p id="library-refresh" class="help"></p>
-      <div class="button-row">
-        <button id="btn-import" class="secondary">Import existing JSON</button>
-        <button id="btn-combined" disabled>Download combined archive</button>
-        <button id="btn-undo" class="secondary" disabled>Undo last update</button>
+      <h3 class="section-label">下载存档</h3>
+      <div class="export-controls" aria-label="导出存档">
+        <div class="form-field">
+          <label for="export-range">内容范围</label>
+          <select id="export-range">
+            <option value="cumulative">全部内容</option>
+            <option value="snapshot" disabled>最近获取</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="export-format">文件格式</label>
+          <select id="export-format">
+            <option value="json">记录文件</option>
+            <option value="csv">表格文件</option>
+            <option value="markdown">阅读文件</option>
+          </select>
+        </div>
+        <button id="btn-export" disabled>下载 JSON</button>
+      </div>
+      <p id="export-status" class="help" role="status" aria-live="polite">将按当前选择下载 JSON 文件。</p>
+      <div class="button-row archive-actions" hidden>
+        <button id="btn-import" class="secondary">导入存档</button>
+        <button id="btn-viewer" class="secondary">查看收藏记录</button>
+        <button id="btn-undo" class="secondary" disabled>撤销更新</button>
       </div>
       <input id="library-file" type="file" accept=".json,application/json" hidden>
-      <p class="help">Import an earlier export to start with your existing data. Updates add and refresh bookmarks; missing or unavailable posts never erase saved content. Each X account has a separate archive.</p>
-      <p class="help">The extension and viewer keep separate browser copies. Download the combined JSON here, then use <strong>Update from JSON</strong> in the viewer. Keep downloaded files as backups.</p>
-    </section>
-    <section id="controls-section" class="card">
-      <label for="update-mode">Update from X</label>
-      <select id="update-mode">
-        <option value="full">Full refresh — all bookmarks and folders</option>
-        <option value="quick">Quick update — recent bookmarks only</option>
-      </select>
-      <p id="mode-help" class="help">Full refresh checks every page and folder. Your previous archive stays saved until collected data is safely merged. Keep this tab open.</p>
-      <div class="button-row">
-        <button id="btn-start" disabled>Full refresh</button>
-        <button id="btn-pause" style="display:none;">Pause</button>
-        <button id="btn-resume" style="display:none;">Resume</button>
-        <button id="btn-stop" style="display:none;">Stop</button>
+      <div id="controls-section" class="workflow-update">
+        <h3 class="section-label">更新收藏</h3>
+        <div class="form-field mode-field">
+          <label for="update-mode">更新方式</label>
+          <select id="update-mode">
+            <option value="full">全部更新</option>
+            <option value="quick">近期更新</option>
+          </select>
+        </div>
+        <p id="mode-help" class="help">首次使用，建议全部更新。
+更新时请保持此页打开。</p>
+        <div class="button-row">
+          <button id="btn-start" disabled>全部更新</button>
+          <button id="btn-pause" style="display:none;">暂停更新</button>
+          <button id="btn-resume" style="display:none;">继续更新</button>
+          <button id="btn-stop" style="display:none;">停止更新</button>
+        </div>
+        <p id="scan-live-status" class="scan-live-status" role="status" aria-live="polite" hidden></p>
       </div>
     </section>
-
     <!-- Progress Section -->
     <section id="progress-section" class="card" style="display:none;">
-      <h2>Progress</h2>
-      <div class="progress-bar-container">
+      <h2>更新进度</h2>
+      <p class="help">总页数未知，显示实际读取进度。</p>
+      <div class="progress-bar-container" role="progressbar" aria-label="正在扫描，总页数未知">
         <div class="progress-bar" id="progress-bar"></div>
       </div>
       <div class="progress-stats">
         <div class="stat">
-          <span class="stat-label">Phase</span>
+          <span class="stat-label">当前步骤</span>
           <span class="stat-value" id="stat-phase">--</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Bookmarks</span>
+          <span class="stat-label">已读条数</span>
           <span class="stat-value" id="stat-bookmarks">0</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Pages</span>
+          <span class="stat-label">已查页数</span>
           <span class="stat-value" id="stat-pages">0</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Folders</span>
+          <span class="stat-label">文件夹</span>
           <span class="stat-value" id="stat-folders">--</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Speed</span>
+          <span class="stat-label">更新速度</span>
           <span class="stat-value" id="stat-speed">--</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Elapsed</span>
+          <span class="stat-label">更新用时</span>
           <span class="stat-value" id="stat-elapsed">0:00</span>
         </div>
       </div>
       <div id="rate-limit-notice" class="notice" style="display:none;">
-        <p>Rate limited. Waiting <span id="cooldown-timer"></span>...</p>
+        <p>X暂时限制读取，等待 <span id="cooldown-timer"></span>…</p>
       </div>
     </section>
 
     <!-- Log Section -->
     <section id="log-section" class="card">
-      <h2>Log</h2>
+      <h2><button id="log-toggle" class="xk-log-toggle" type="button" aria-controls="log" aria-expanded="true"><span>更新过程</span><span class="xk-log-chevron" aria-hidden="true"></span></button></h2>
       <div id="log" class="log-container"></div>
     </section>
 
     <!-- Result Section (shown after complete or stop) -->
     <section id="result-section" class="card" style="display:none;">
-      <h2 id="result-heading">Export Complete</h2>
+      <h2 id="result-heading">采集完成</h2>
       <p id="result-account" class="help"></p>
       <p id="result-coverage" class="help" role="status"></p>
       <div class="complete-stats">
-        <p><strong id="result-total">0</strong> bookmarks collected in this scan</p>
-        <p><strong id="result-available">0</strong> available, <strong id="result-unavailable">0</strong> unavailable</p>
+        <div id="result-transition" hidden>
+          <p class="xk-count-transition">内容总数 <strong id="result-before">0</strong> <span aria-label="更新为">→</span> <strong id="result-after">0</strong> 条</p>
+          <p id="result-changes"></p>
+          <p id="result-update-time" class="help"></p>
+        </div>
+        <div id="result-observations">
+        <p>本次读取 <strong id="result-total">0</strong> 条书签</p>
+        <p><strong id="result-available">0</strong> 条可用，<strong id="result-unavailable">0</strong> 条暂不可用</p>
         <div id="result-unavailable-reasons" style="display:none;"></div>
-        <p id="result-folder-summary"><strong id="result-folders">0</strong> folders found</p>
-        <p>Duration: <strong id="result-duration">0:00</strong></p>
+        <p id="result-folder-summary">发现 <strong id="result-folders">0</strong> 个文件夹</p>
+        </div>
+        <p>用时：<strong id="result-duration">0:00</strong></p>
       </div>
       <div class="button-row">
-        <button id="btn-download">Download latest snapshot</button>
-        <button id="btn-recover" class="secondary">Merge collected snapshot</button>
+        <button id="btn-recover" class="secondary">保存结果</button>
       </div>
-      <p class="help">A snapshot contains only this scan’s results. The combined archive above includes previously saved bookmarks too. Pause/Resume works while this tab stays open. After closing it, collected data can be recovered here; the next scan starts from the beginning.</p>
+      <p id="result-help" class="help">快照只包含最近一次采集。暂停和继续需要保持此页面打开；若页面关闭，可在此恢复已采集结果，新扫描会从头开始。</p>
     </section>
+
+    <div id="likes-panel" hidden>
+      <section class="card">
+        <p id="likes-status" role="status" aria-live="polite">正在读取当前账号…</p>
+        <h3 class="section-label">下载存档</h3>
+        <div class="export-controls" aria-label="导出点赞存档">
+          <div class="form-field">
+            <label for="likes-range">内容范围</label>
+            <select id="likes-range"><option value="cumulative">累计存档</option><option value="snapshot">最近获取</option></select>
+          </div>
+          <div class="form-field">
+            <label for="likes-format">文件格式</label>
+            <select id="likes-format"><option value="json">记录文件</option><option value="csv">表格文件</option><option value="markdown">阅读文件</option></select>
+          </div>
+          <button id="likes-export" disabled>下载 JSON</button>
+        </div>
+        <p id="likes-export-status" class="help" role="status" aria-live="polite">将按当前选择下载 JSON 文件。</p>
+        <div class="button-row archive-actions" hidden>
+          <button id="likes-import" class="secondary">导入存档</button>
+          <button id="likes-viewer" class="secondary">查看点赞记录</button>
+          <button id="likes-undo" class="secondary" disabled>撤销更新</button>
+        </div>
+        <input id="likes-file" type="file" accept=".json,application/json" hidden>
+        <div class="workflow-update">
+          <h3 class="section-label">更新点赞</h3>
+          <p id="likes-recommendation" class="help"></p>
+          <div class="form-field mode-field">
+            <label for="likes-mode">更新方式</label>
+            <select id="likes-mode">
+              <option value="quick">近期更新</option>
+              <option value="full">全部更新</option>
+            </select>
+          </div>
+          <p id="likes-mode-help" class="help">检查近期点赞，保留已有记录。
+较早内容的变化可能漏查。</p>
+          <div class="button-row"><button id="likes-start">近期更新</button><button id="likes-pause" class="secondary" hidden>暂停更新</button><button id="likes-resume" class="secondary" hidden>继续更新</button><button id="likes-stop" class="secondary" hidden>停止更新</button><button id="likes-recover" class="secondary" hidden>合并未完成快照</button></div>
+          <section id="likes-progress-section" class="xk-likes-progress" hidden aria-label="点赞更新进度">
+            <h3 class="section-label" id="likes-progress-title">更新进度</h3>
+            <p id="likes-progress" class="help" role="status" aria-live="polite"></p>
+            <div class="progress-bar-container" role="progressbar" aria-label="正在采集点赞，总页数未知"><div id="likes-progress-bar" class="progress-bar indeterminate"></div></div>
+            <div class="progress-stats">
+              <div class="stat"><span class="stat-label" id="likes-count-label">已读条数</span><span class="stat-value" id="likes-stat-count">0</span></div>
+              <div class="stat"><span class="stat-label" id="likes-pages-label">已查页数</span><span class="stat-value" id="likes-stat-pages">0</span></div>
+              <div class="stat"><span class="stat-label" id="likes-rate-label">更新速度</span><span class="stat-value" id="likes-stat-rate">--</span></div>
+              <div class="stat"><span class="stat-label" id="likes-time-label">更新用时</span><span class="stat-value" id="likes-stat-time">0:00</span></div>
+            </div>
+          </section>
+          <div id="likes-result" role="status" aria-live="polite"></div>
+          <details id="likes-log-section" class="xk-likes-log" hidden><summary id="likes-log-title">更新过程</summary><div id="likes-log" class="log-container"></div></details>
+        </div>
+      </section>
+    </div>
 
     <!-- Footer -->
     <footer>
       <span id="version-info"></span>
-      &middot; <a href="https://github.com/sytelus/xarchive" target="_blank" rel="noopener">GitHub</a>
+      &middot; <a href="licenses.html" target="_blank" rel="noopener">许可说明</a>
     </footer>
   </div>
 
   <dialog id="library-review" aria-labelledby="library-review-title">
-    <h2 id="library-review-title">Review archive import</h2>
+    <h2 id="library-review-title">确认更新</h2>
     <p id="library-review-summary"></p>
     <p id="library-review-coverage" class="help"></p>
-    <p id="library-review-expectation" class="help">Save adds and refreshes bookmarks for this account. Older saved content stays. Undo restores your previous archive.</p>
+    <p id="library-review-expectation" class="help">确认保存后会补充和刷新此账号的书签；较早的存档内容会保留，并可撤销本次更新。</p>
     <p id="library-review-error" role="alert"></p>
-    <div class="button-row"><button id="library-cancel" class="secondary">Cancel</button><button id="library-save">Save update</button></div>
+    <div class="button-row"><button id="library-cancel" class="secondary">取消</button><button id="library-save">保存更新</button></div>
   </dialog>
 
-  <script type="module" src="options.js"></script>
+  <dialog id="likes-review" aria-labelledby="likes-review-title">
+    <h2 id="likes-review-title">确认更新</h2>
+    <p id="likes-review-summary"></p>
+    <p id="likes-review-error" role="alert"></p>
+    <div class="button-row"><button id="likes-cancel" class="secondary">取消</button><button id="likes-save">保存更新</button></div>
+  </dialog>
+
+  <script src="lib/i18n.js"></script>
+  <script src="ui-locale-init.js"></script>
+  <script src="lib/archive.js"></script>
+  <script src="lib/search-index.js"></script>
+  <script type="module" src="search-ui.js"></script>
+  <script type="module" src="media-ui.js"></script>
+  <script type="module" src="schedule-ui.js"></script>
+  <script type="module" src="options.js?v=1.4.2"></script>
+  <script type="module" src="likes-ui.js?v=1.4.2"></script>
+  <script type="module" src="shell-ui.js"></script>
 </body>
 </html>

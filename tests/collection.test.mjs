@@ -40,6 +40,31 @@ test('quick boundary requires an entire known page, which is still refreshed', a
   assert.deepEqual(stored.map(b => b.tweet_id), ['3', '1', '1', '2']);
 });
 
+test('limited sample makes one request for three bookmarks and stays partial', async () => {
+  const { context, stored, calls } = fetchContext([page(['1', '2', '3'], 'more')]);
+  const result = await context.fetchAllBookmarks({ queryId: 'test', count: 3, maxPages: 1, maxAttempts: 1, maxBookmarks: 3 });
+  assert.equal(result.reason, 'sample_limit');
+  assert.equal(result.stopped, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][2].count, 3);
+  assert.deepEqual(stored.map(b => b.tweet_id), ['1', '2', '3']);
+});
+
+test('limited sample does not retry a rate limit', async () => {
+  const { context, calls } = fetchContext([{ error: 'rate_limited', status: 429 }]);
+  const result = await context.fetchAllBookmarks({ queryId: 'test', count: 3, maxPages: 1, maxAttempts: 1 });
+  assert.equal(result.reason, 'rate_limit_exceeded');
+  assert.equal(calls.length, 1);
+});
+
+test('limited sample stores at most three if X returns extra bookmarks', async () => {
+  const { context, stored, calls } = fetchContext([page(['1', '2', '3', '4', '5'], 'more')]);
+  const result = await context.fetchAllBookmarks({ queryId: 'test', count: 3, maxPages: 1, maxAttempts: 1, maxBookmarks: 3 });
+  assert.equal(result.reason, 'sample_limit');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(stored.map(b => b.tweet_id), ['1', '2', '3']);
+});
+
 test('unrecognized responses and looping cursors never claim complete', async () => {
   const bad = fetchContext([{ error: null, data: {} }]);
   assert.equal((await bad.context.fetchAllBookmarks({})).reason, 'unrecognized_response');

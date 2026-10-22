@@ -1,0 +1,419 @@
+{
+  "schema_version": 1,
+  "gate": {
+    "mode": "formal",
+    "status": "passed",
+    "generated_at": "2026-10-22T14:06:46.272826+00:00",
+    "valid_until": "2026-10-28T16:38:17+00:00"
+  },
+  "project": {
+    "name": "Xkeeps-Extension",
+    "slug": "xkeeps-extension",
+    "problem": "将 X 收藏和点赞可靠保留、浏览并导出到本机，普通用户能理解文件来源与扫描结果",
+    "target_users": [
+      "有 X 收藏或点赞归档需求的个人知识工作者",
+      "需要多格式备份的非技术用户"
+    ],
+    "why_now": "准备现有 Xkeeps 的免费公开分发副本，隔离私人开发数据与公开资产",
+    "scope": "new_repository",
+    "implementation_owner": "codex-xkeeps-public-preparation"
+  },
+  "survey": {
+    "skill": "survey",
+    "survey_run_id": "survey-xkeeps-extension-20261022-reuse",
+    "completed_at": "2026-10-22T14:06:46.272826+00:00",
+    "github_search_snapshot_path": "github-search.snapshot.json",
+    "github_search_snapshot_sha256": "35088b78437cecad03d1cb0f620961374777225f57375684e5b0a218023838ff",
+    "queries": [
+      {
+        "provider": "github",
+        "query": "xarchive in:name",
+        "result_url": "https://github.com/search?q=xarchive+in%3Aname&type=repositories",
+        "searched_at": "2026-09-29T16:35:30.088716+00:00"
+      },
+      {
+        "provider": "github",
+        "query": "twitter likes archive in:name",
+        "result_url": "https://github.com/search?q=twitter+likes+archive+in%3Aname&type=repositories",
+        "searched_at": "2026-09-29T16:35:30.088716+00:00"
+      },
+      {
+        "provider": "github",
+        "query": "x bookmarks likes export",
+        "result_url": "https://github.com/search?q=x+bookmarks+likes+export&type=repositories",
+        "searched_at": "2026-09-29T16:35:30.088716+00:00"
+      },
+      {
+        "provider": "github",
+        "query": "twitter bookmarks media zip",
+        "result_url": "https://github.com/search?q=twitter+bookmarks+media+zip&type=repositories",
+        "searched_at": "2026-09-29T16:35:30.088716+00:00"
+      },
+      {
+        "provider": "web",
+        "query": "X bookmarks export and likes local archive alternatives",
+        "result_url": "https://github.com/viperrcrypto/Siftly",
+        "searched_at": "2026-09-29T16:38:17+00:00"
+      }
+    ],
+    "no_candidates_found": false,
+    "no_candidates_reason": "",
+    "candidates": [
+      {
+        "name": "sytelus/xarchive",
+        "url": "https://github.com/sytelus/xarchive",
+        "source_commit": "ae9d0263617a200ce142e64fb2ddc6301ebf19cf",
+        "source_commit_url": "https://github.com/sytelus/xarchive/commit/ae9d0263617a200ce142e64fb2ddc6301ebf19cf",
+        "github_snapshot_path": "github-sytelus-xarchive.snapshot.json",
+        "github_snapshot_sha256": "5d5012cdfb1331e34738e4f227aa064b90fe737e4ed576a88663f9dbb7b6aeef",
+        "category": "direct",
+        "maintenance": {
+          "status": "active",
+          "evidence": [
+            {
+              "url": "https://github.com/sytelus/xarchive/commit/ae9d0263617a200ce142e64fb2ddc6301ebf19cf",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "默认分支最近提交 2026-09-05T07:16:00Z，仓库未归档；不据此推定持续维护"
+            }
+          ]
+        },
+        "adoption": {
+          "status": "unknown",
+          "evidence": [
+            {
+              "url": "https://github.com/sytelus/xarchive",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "99 stars 和 14 forks 是弱信号，真实采用未知"
+            }
+          ]
+        },
+        "license": {
+          "spdx": "MIT",
+          "evidence_url": "https://github.com/sytelus/xarchive/blob/main/LICENSE"
+        },
+        "security": {
+          "status": "needs_review",
+          "notes": "使用 X 数据与本地归档；未完成独立安全审计，不推断无风险",
+          "evidence": [
+            {
+              "url": "https://github.com/sytelus/xarchive/security",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "公开仓库安全页不能证明无风险"
+            }
+          ]
+        },
+        "strengths": [
+          {
+            "claim": "收藏分页、文件夹及累计归档已有实现",
+            "evidence_urls": [
+              "https://github.com/sytelus/xarchive"
+            ]
+          }
+        ],
+        "gaps": [
+          {
+            "claim": "用户要求点赞、多格式和统一交互，当前本地衍生代码须整合",
+            "basis": "user_feedback",
+            "confidence": "medium",
+            "evidence_urls": [
+              "https://github.com/sytelus/xarchive"
+            ]
+          }
+        ],
+        "fit": "fork"
+      },
+      {
+        "name": "lhl/tweetxvault",
+        "url": "https://github.com/lhl/tweetxvault",
+        "source_commit": "b282047c728b65e3a6ef3a9cf3c1e59634bf725f",
+        "source_commit_url": "https://github.com/lhl/tweetxvault/commit/b282047c728b65e3a6ef3a9cf3c1e59634bf725f",
+        "github_snapshot_path": "github-lhl-tweetxvault.snapshot.json",
+        "github_snapshot_sha256": "2b85c386d14945288a804b4ca811bda6f63799e4d995838ddab7eb3a0644bd1c",
+        "category": "workflow_alternative",
+        "maintenance": {
+          "status": "active",
+          "evidence": [
+            {
+              "url": "https://github.com/lhl/tweetxvault/commit/b282047c728b65e3a6ef3a9cf3c1e59634bf725f",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "默认分支最近提交 2026-07-20T18:04:38Z，仓库未归档；不据此推定持续维护"
+            }
+          ]
+        },
+        "adoption": {
+          "status": "unknown",
+          "evidence": [
+            {
+              "url": "https://github.com/lhl/tweetxvault",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "49 stars 和 6 forks 是弱信号，真实采用未知"
+            }
+          ]
+        },
+        "license": {
+          "spdx": "Apache-2.0",
+          "evidence_url": "https://github.com/lhl/tweetxvault/blob/main/LICENSE"
+        },
+        "security": {
+          "status": "needs_review",
+          "notes": "使用 X 数据与本地归档；未完成独立安全审计，不推断无风险",
+          "evidence": [
+            {
+              "url": "https://github.com/lhl/tweetxvault/security",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "公开仓库安全页不能证明无风险"
+            }
+          ]
+        },
+        "strengths": [
+          {
+            "claim": "收藏和点赞均可本地归档",
+            "evidence_urls": [
+              "https://github.com/lhl/tweetxvault"
+            ]
+          }
+        ],
+        "gaps": [
+          {
+            "claim": "其 README 主路径为 Python CLI，而非本次浏览器零基础交互",
+            "basis": "source",
+            "confidence": "medium",
+            "evidence_urls": [
+              "https://github.com/lhl/tweetxvault"
+            ]
+          }
+        ],
+        "fit": "reference"
+      },
+      {
+        "name": "prinsss/twitter-web-exporter",
+        "url": "https://github.com/prinsss/twitter-web-exporter",
+        "source_commit": "ddf2b0c823680b904daae166f3eb05b81950ce7e",
+        "source_commit_url": "https://github.com/prinsss/twitter-web-exporter/commit/ddf2b0c823680b904daae166f3eb05b81950ce7e",
+        "github_snapshot_path": "github-prinsss-twitter-web-exporter.snapshot.json",
+        "github_snapshot_sha256": "127197e91c7adf583228992fb27378a067d94610dca3e7994e7021e527cef75a",
+        "category": "direct",
+        "maintenance": {
+          "status": "active",
+          "evidence": [
+            {
+              "url": "https://github.com/prinsss/twitter-web-exporter/commit/ddf2b0c823680b904daae166f3eb05b81950ce7e",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "默认分支最近提交 2026-08-31T04:20:07Z，仓库未归档；不据此推定持续维护"
+            }
+          ]
+        },
+        "adoption": {
+          "status": "unknown",
+          "evidence": [
+            {
+              "url": "https://github.com/prinsss/twitter-web-exporter",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "2725 stars 和 206 forks 是弱信号，真实采用未知"
+            }
+          ]
+        },
+        "license": {
+          "spdx": "MIT",
+          "evidence_url": "https://github.com/prinsss/twitter-web-exporter/blob/main/LICENSE"
+        },
+        "security": {
+          "status": "needs_review",
+          "notes": "使用 X 数据与本地归档；未完成独立安全审计，不推断无风险",
+          "evidence": [
+            {
+              "url": "https://github.com/prinsss/twitter-web-exporter/security",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "公开仓库安全页不能证明无风险"
+            }
+          ]
+        },
+        "strengths": [
+          {
+            "claim": "书签、点赞、多格式与媒体 ZIP 均有公开项目说明",
+            "evidence_urls": [
+              "https://github.com/prinsss/twitter-web-exporter"
+            ]
+          }
+        ],
+        "gaps": [
+          {
+            "claim": "README 明确采集依赖网页加载和用户滚动，不是独立自动采集流程",
+            "basis": "source",
+            "confidence": "medium",
+            "evidence_urls": [
+              "https://github.com/prinsss/twitter-web-exporter"
+            ]
+          }
+        ],
+        "fit": "reference"
+      },
+      {
+        "name": "zendegani/XClipper",
+        "url": "https://github.com/zendegani/XClipper",
+        "source_commit": "eaa9623559fc276286f896d50e5e3b6e2ec45364",
+        "source_commit_url": "https://github.com/zendegani/XClipper/commit/eaa9623559fc276286f896d50e5e3b6e2ec45364",
+        "github_snapshot_path": "github-zendegani-XClipper.snapshot.json",
+        "github_snapshot_sha256": "f3b5561d4f6c7c48b3cbee5199572240db167b87b4b5699b4347ade9874294c2",
+        "category": "direct",
+        "maintenance": {
+          "status": "active",
+          "evidence": [
+            {
+              "url": "https://github.com/zendegani/XClipper/commit/eaa9623559fc276286f896d50e5e3b6e2ec45364",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "默认分支最近提交 2026-09-26T18:52:29Z，仓库未归档；不据此推定持续维护"
+            }
+          ]
+        },
+        "adoption": {
+          "status": "unknown",
+          "evidence": [
+            {
+              "url": "https://github.com/zendegani/XClipper",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "47 stars 和 9 forks 是弱信号，真实采用未知"
+            }
+          ]
+        },
+        "license": {
+          "spdx": "NOASSERTION",
+          "evidence_url": "https://github.com/zendegani/XClipper/blob/main/LICENSE.md"
+        },
+        "security": {
+          "status": "needs_review",
+          "notes": "源码可查但未独立安全审计；本次选择不迁入。个人非商业使用须符合其许可条款，未来商业衍生需另获授权。",
+          "evidence": [
+            {
+              "url": "https://github.com/zendegani/XClipper/security",
+              "observed_at": "2026-09-29T16:38:17+00:00",
+              "claim": "公开仓库安全页不能证明无风险"
+            }
+          ]
+        },
+        "strengths": [
+          {
+            "claim": "浏览器扩展可批量导出收藏、点赞和媒体文件，格式丰富",
+            "evidence_urls": [
+              "https://github.com/zendegani/XClipper"
+            ]
+          }
+        ],
+        "gaps": [
+          {
+            "claim": "账户累计归档和本地浏览差异未被证实，需要独立实测",
+            "basis": "inference",
+            "confidence": "low",
+            "evidence_urls": [
+              "https://github.com/zendegani/XClipper"
+            ]
+          }
+        ],
+        "fit": "reference"
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "fork",
+    "rationale": [
+      "沿用现有 xarchive 派生实现，以干净快照和公开上游历史组成可审计的免费分发副本，不引入私有提交。"
+    ],
+    "why_existing_not_sufficient": [
+      "替代工具可满足大量导出需求；现有累计 JSON 迁移兼容性尚未验证。此轮维持现有产品流程，只准备公开分发，不重复开发。"
+    ],
+    "minimum_differentiation": [
+      "既有按账户隔离的收藏与点赞归档、搜索、中英文交互及多格式导出；明确安装、迁移与隐私边界。"
+    ],
+    "upstream_sources": [
+      {
+        "repository_url": "https://github.com/sytelus/xarchive",
+        "base_commit": "ae9d0263617a200ce142e64fb2ddc6301ebf19cf"
+      }
+    ],
+    "next_step": "完成独立复核与 formal 校验，再按受控路径准备建仓；公开仓库、官网部署和 X 发帖须另获确认。"
+  },
+  "independent_review": {
+    "review_run_id": "review-xkeeps-extension-20261022-admission-independent-r1",
+    "reviewer": "codex-admission-review-independent",
+    "reviewer_role": "independent_reviewer",
+    "reviewed_at": "2026-10-22T14:11:25.993238+00:00",
+    "reviewed_report_sha256": "ad538af9b4ce1dbb804e5df3372812aae2a9d9f95e7059016264093edd82ab1c",
+    "verdict": "pass",
+    "checks": [
+      {
+        "id": "coverage",
+        "result": "pass",
+        "evidence": "已核对原 survey 的 triage/context/solutions 与同产品范围、四个 collector 搜索词及结果，以及 xarchive、tweetxvault、twitter-web-exporter、XClipper 四候选。覆盖足以支撑现有产品公开分发的小范围决策；英文查询和有限结果不能证明无遗漏或市场最优。报告保留手工保存、原生收藏和直接采用替代品。"
+      },
+      {
+        "id": "maintenance",
+        "result": "pass",
+        "evidence": "四份 API 快照的精确提交、归档状态、提交时间与 manifest 一致。历史 active 状态有原观察日期，不由 README 或今日可访问性推定持续维护；刷新失败已披露，有效期未超过原窗口。"
+      },
+      {
+        "id": "adoption",
+        "result": "pass",
+        "evidence": "四候选采用结论均为 unknown；历史 stars/forks 和维护者用户数声明不作独立采用证明。报告明确品牌增长是目标，未把旧本地验收转写为市场采用。"
+      },
+      {
+        "id": "license_security",
+        "result": "pass",
+        "evidence": "独立回读 xarchive 精确基线的 MIT 文件与 XClipper 的 PolyForm Noncommercial 文件；API NOASSERTION 未被伪装成自由商用许可。报告保留第三方通知、禁止迁入 XClipper 代码，并将四候选安全状态限定为 needs_review。此项通过不是法律意见或完整安全审计，也不覆盖未来仓库全部历史。"
+      },
+      {
+        "id": "confirmation_bias",
+        "result": "pass",
+        "evidence": "明确 fork/new_repository，未为绕过 ancestry 门禁改为 integrate；接受直接采用 XClipper 可能降低维护成本，兼容性未知不作为已证实缺陷。本次不开发新功能，新增公开祖先和准入材料范围仍须公开确认。"
+      },
+      {
+        "id": "evidence_integrity",
+        "result": "pass",
+        "evidence": "独立计算报告、搜索包与四仓快照共六个 SHA-256，全部匹配 manifest。四个 GitHub 查询与 collector bundle 一致，incomplete_results 均为 false；上游基线与快照精确提交一致。报告、manifest、五快照未检出本机绝对路径、私人身份或邮箱，人工检查未见旧私人验收样本。研究通过与建仓后 ancestry/refs/身份/CI 验收明确分开。"
+      }
+    ],
+    "challenges": [
+      {
+        "challenge": "无历史快照如果为满足创建门禁而标为 integrate，会掩盖已有 xarchive 代码派生关系。",
+        "resolution": "最终选择 fork，拟保留公开基线及公开祖先，随后应用清洁快照；不带 Xkeeps 私有提交。实际 Git 祖先和首条本地提交留在建仓后验证，不因研究 pass 视为已执行。",
+        "evidence_urls": [
+          "https://github.com/sytelus/xarchive/commit/ae9d0263617a200ce142e64fb2ddc6301ebf19cf"
+        ]
+      },
+      {
+        "challenge": "强替代已覆盖多格式导出；继续分发 Xkeeps 可能只是既有投入偏好，不能宣称全面优于竞品。",
+        "resolution": "报告承认 XClipper、UserScript 和 CLI 替代方案，限定为既有免费产品的分发；兼容迁移未知不是竞品缺陷，若替代能满足流程应重评维护成本。",
+        "evidence_urls": [
+          "https://github.com/zendegani/XClipper",
+          "https://github.com/prinsss/twitter-web-exporter",
+          "https://github.com/lhl/tweetxvault"
+        ]
+      },
+      {
+        "challenge": "今天重开网页不等于刷新搜索与 API 数据，旧快照可能被赋予虚假的新鲜度。",
+        "resolution": "保留原字节、时间和哈希，披露 403/IncompleteRead，未将旧采用和维护指标写成今天的数据；截止时间仍不超过 2026-10-28T16:38:17+00:00。",
+        "evidence_urls": [
+          "https://github.com/sytelus/xarchive",
+          "https://github.com/lhl/tweetxvault"
+        ]
+      },
+      {
+        "challenge": "治理准入材料及上游历史扩大原应用文件范围，可能泄露私有治理信息或被误当作已获准公开。",
+        "resolution": "报告从零编写并已检查脱敏，明确新增范围尚未获准公开；创建器 receipt、规则、CI 生成内容和全部 refs 仍需后续独立检查，不能原样公开内部生成物。",
+        "evidence_urls": [
+          "https://github.com/sytelus/xarchive"
+        ]
+      },
+      {
+        "challenge": "twitter-web-exporter 的滚动依赖由维护者文档支持，原 manifest 却标为 user_feedback。",
+        "resolution": "实施方已将该 gap 的 basis 修正为 source；复核再次读取确认，报告哈希未变。",
+        "evidence_urls": [
+          "https://github.com/prinsss/twitter-web-exporter#faq"
+        ]
+      }
+    ]
+  },
+  "artifacts": {
+    "report_path": "pre-project-survey.md",
+    "report_sha256": "ad538af9b4ce1dbb804e5df3372812aae2a9d9f95e7059016264093edd82ab1c"
+  }
+}
