@@ -12,7 +12,7 @@
 
 Desktop Chrome · Manual installation · No build tools needed
 
-![Xkeeps home screen with separate bookmarks and likes archives; synthetic demo data](https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/en-01-home.jpg)
+![Xkeeps home screen with separate bookmarks and likes archives; synthetic demo data](https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/en-01-home.jpg)
 
 [See it in use](#see-it-in-use) · [Install](#install-for-free) · [First export](#your-first-export) · [How it works](#how-it-works) · [Privacy](#privacy-and-limits) · [FAQ](#questions-before-you-install)
 
@@ -35,8 +35,8 @@ Xkeeps gives you a local copy to work with. Bookmarks and likes stay separate, e
 <table>
 <tr><th>Find something you saved</th><th>Read your downloaded archive</th></tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/en-02-search.jpg" alt="Local keyword search with date and folder filters, using synthetic posts" width="480"></td>
-<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/en-03-offline.jpg" alt="Offline reader displaying synthetic post text and a downloaded illustration" width="480"></td>
+<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/en-02-search.jpg" alt="Local keyword search with date and folder filters, using synthetic posts" width="480"></td>
+<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/en-03-offline.jpg" alt="Offline reader displaying synthetic post text and a downloaded illustration" width="480"></td>
 </tr>
 </table>
 
@@ -125,7 +125,7 @@ Optional scheduled checks are experimental and off by default. They require Chro
 - Local storage is **not an encrypted vault**. Session connection information and exported archives can be sensitive.
 - Do not attach private archives, cookies or authorization headers to public issues. Send only a version number, reproduction steps and sanitized errors.
 
-Read [privacy and permissions](docs/privacy.md) and [security reporting](SECURITY.md). A detailed [Chinese usage guide](https://github.com/JinHanAI/Xkeeps-Extension/blob/main/docs/usage.zh-CN.md) covers update modes, download limits and the standalone viewer.
+Read [privacy and permissions](docs/privacy.md) and [security reporting](SECURITY.md). A detailed [Chinese usage guide](https://github.com/JinHanAI/Xkeeps-Extension/blob/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/usage.zh-CN.md) covers update modes, download limits and the standalone viewer.
 
 ## Development
 

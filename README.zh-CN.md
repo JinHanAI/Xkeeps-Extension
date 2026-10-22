@@ -12,7 +12,7 @@
 
 桌面 Chrome · 手动安装 · 无需编程或构建工具
 
-![Xkeeps 首页，收藏与点赞分开保存；画面使用合成演示数据](https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/zh-01-home.jpg)
+![Xkeeps 首页，收藏与点赞分开保存；画面使用合成演示数据](https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/zh-01-home.jpg)
 
 [使用效果](#使用效果) · [免费安装](#免费安装) · [第一次导出](#第一次导出) · [工作原理](#工作原理) · [常见问题](#常见问题) · [隐私](#隐私与边界)
 
@@ -35,8 +35,8 @@ Xkeeps 把可获取的内容留在本地。先搜到，再导出，之后可以�
 <table>
 <tr><th>搜到保存过的内容</th><th>打开下载好的离线存档</th></tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/zh-02-search.jpg" alt="使用关键词、日期和文件夹筛选本地合成帖子" width="480"></td>
-<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/main/docs/images/zh-03-offline.jpg" alt="离线查看页展示合成帖子的正文与已下载图片" width="480"></td>
+<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/zh-02-search.jpg" alt="使用关键词、日期和文件夹筛选本地合成帖子" width="480"></td>
+<td><img src="https://raw.githubusercontent.com/JinHanAI/Xkeeps-Extension/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/images/zh-03-offline.jpg" alt="离线查看页展示合成帖子的正文与已下载图片" width="480"></td>
 </tr>
 </table>
 
@@ -118,7 +118,7 @@ flowchart TD
 
 </details>
 
-更多更新方式、下载大小限制和独立查看器说明，见 **[完整在线使用手册](https://github.com/JinHanAI/Xkeeps-Extension/blob/main/docs/usage.zh-CN.md)**。
+更多更新方式、下载大小限制和独立查看器说明，见 **[完整在线使用手册](https://github.com/JinHanAI/Xkeeps-Extension/blob/3e873b67f557cb7e8198bd1fb6ffa86885e85a22/docs/usage.zh-CN.md)**。
 
 ## 隐私与边界
 
